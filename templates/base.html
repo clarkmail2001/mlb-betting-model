@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}MLB Model{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Light theme - slate grays, red accents, hazelnut tones */
+            --bg-main: #f5f3f0;
+            --bg-card: #ffffff;
+            --bg-hover: #edeae5;
+            --bg-dark: #3d4148;
+            --border: #d1ccc4;
+            --border-dark: #b8b2a8;
+            --text: #2c3038;
+            --text-muted: #6b7280;
+            --text-light: #9ca3af;
+            
+            /* Accent colors */
+            --accent-red: #c44536;
+            --accent-red-light: #e85a4f;
+            --accent-hazel: #a67c52;
+            --accent-hazel-light: #c9a77d;
+            --accent-slate: #5c6370;
+            --accent-green: #4a7c59;
+            
+            /* Header */
+            --header-bg: #3d4148;
+            --header-text: #f5f3f0;
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body { 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
+            background: var(--bg-main); 
+            color: var(--text); 
+            line-height: 1.6;
+            font-size: 14px;
+        }
+        
+        .container { 
+            max-width: 1400px; 
+            margin: 0 auto; 
+            padding: 24px; 
+        }
+        
+        /* Navigation */
+        nav { 
+            background: var(--header-bg); 
+            padding: 0 24px; 
+            border-bottom: 3px solid var(--accent-red);
+        }
+        
+        nav .nav-content { 
+            max-width: 1400px; 
+            margin: 0 auto; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            height: 60px;
+        }
+        
+        nav .logo { 
+            font-family: 'IBM Plex Mono', monospace; 
+            font-size: 1.4rem; 
+            font-weight: 700; 
+            color: var(--header-text); 
+            text-decoration: none; 
+            letter-spacing: -0.5px;
+        }
+        
+        nav .logo span { color: var(--accent-red); }
+        
+        nav .nav-links { display: flex; gap: 8px; }
+        
+        nav .nav-links a { 
+            color: var(--header-text); 
+            text-decoration: none; 
+            font-weight: 500; 
+            font-size: 13px; 
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background 0.15s;
+        }
+        
+        nav .nav-links a:hover { 
+            background: rgba(255,255,255,0.1); 
+        }
+        
+        nav .nav-links a.active {
+            background: var(--accent-red);
+        }
+        
+        /* Cards */
+        .card { 
+            background: var(--bg-card); 
+            border: 1px solid var(--border); 
+            border-radius: 8px; 
+            padding: 20px; 
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .card h2, .card h3 { 
+            font-family: 'IBM Plex Mono', monospace; 
+            font-weight: 600; 
+            font-size: 13px; 
+            text-transform: uppercase; 
+            letter-spacing: 0.5px;
+            color: var(--accent-slate);
+        }
+        
+        /* Buttons */
+        .btn { 
+            background: var(--accent-red); 
+            color: #fff; 
+            border: none; 
+            padding: 10px 20px; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            font-weight: 600; 
+            text-decoration: none; 
+            display: inline-block; 
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            transition: background 0.15s;
+        }
+        
+        .btn:hover { background: var(--accent-red-light); }
+        
+        .btn-secondary { 
+            background: var(--bg-hover); 
+            color: var(--text); 
+            border: 1px solid var(--border); 
+        }
+        
+        .btn-secondary:hover { background: var(--border); }
+        
+        .btn-hazel {
+            background: var(--accent-hazel);
+        }
+        
+        .btn-hazel:hover { background: var(--accent-hazel-light); }
+        
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        
+        /* Forms */
+        input, select, textarea { 
+            background: var(--bg-card); 
+            border: 1px solid var(--border); 
+            color: var(--text); 
+            padding: 10px 12px; 
+            border-radius: 4px; 
+            width: 100%; 
+            font-size: 13px; 
+            font-family: 'Inter', sans-serif;
+        }
+        
+        input:focus, select:focus, textarea:focus { 
+            outline: none; 
+            border-color: var(--accent-hazel);
+            box-shadow: 0 0 0 3px rgba(166,124,82,0.15);
+        }
+        
+        label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        
+        /* Tables */
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            font-size: 13px;
+        }
+        
+        th, td { 
+            padding: 10px 12px; 
+            text-align: left; 
+            border-bottom: 1px solid var(--border); 
+        }
+        
+        th { 
+            background: var(--bg-hover); 
+            font-weight: 600; 
+            font-size: 11px; 
+            text-transform: uppercase; 
+            letter-spacing: 0.3px; 
+            color: var(--text-muted);
+            font-family: 'IBM Plex Mono', monospace;
+        }
+        
+        tr:hover { background: var(--bg-hover); }
+        
+        /* Stats coloring */
+        .stat-good { color: var(--accent-green); font-weight: 600; }
+        .stat-bad { color: var(--accent-red); font-weight: 600; }
+        .stat-neutral { color: var(--text-muted); }
+        
+        /* Grid */
+        .grid { display: grid; gap: 16px; }
+        .grid-2 { grid-template-columns: repeat(2, 1fr); }
+        .grid-3 { grid-template-columns: repeat(3, 1fr); }
+        .grid-4 { grid-template-columns: repeat(4, 1fr); }
+        
+        @media (max-width: 768px) { 
+            .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; } 
+        }
+        
+        /* Badges */
+        .badge { 
+            display: inline-block; 
+            padding: 3px 8px; 
+            border-radius: 4px; 
+            font-size: 11px; 
+            font-weight: 600; 
+            font-family: 'IBM Plex Mono', monospace;
+        }
+        
+        .badge-green { background: rgba(74,124,89,0.15); color: var(--accent-green); }
+        .badge-red { background: rgba(196,69,54,0.15); color: var(--accent-red); }
+        .badge-hazel { background: rgba(166,124,82,0.15); color: var(--accent-hazel); }
+        .badge-slate { background: rgba(92,99,112,0.15); color: var(--accent-slate); }
+        
+        /* Utilities */
+        .hidden { display: none !important; }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-muted { color: var(--text-muted); }
+        .mb-8 { margin-bottom: 8px; }
+        .mb-16 { margin-bottom: 16px; }
+        .mb-24 { margin-bottom: 24px; }
+        .mt-8 { margin-top: 8px; }
+        .mt-16 { margin-top: 16px; }
+        .mt-24 { margin-top: 24px; }
+        .mono { font-family: 'IBM Plex Mono', monospace; }
+        
+        h1 { 
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 28px; 
+            font-weight: 700; 
+            margin-bottom: 24px; 
+            color: var(--text);
+            letter-spacing: -0.5px;
+        }
+        
+        h1 span { color: var(--accent-red); }
+        
+        a { color: var(--accent-hazel); text-decoration: none; }
+        a:hover { color: var(--accent-hazel-light); text-decoration: underline; }
+        
+        /* Big stats display */
+        .stat-box {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .stat-box .value {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 36px;
+            font-weight: 700;
+            color: var(--accent-hazel);
+            line-height: 1;
+        }
+        
+        .stat-box .label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        
+        /* Calculation breakdown */
+        .calc-steps {
+            background: var(--bg-hover);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 16px;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 12px;
+            line-height: 1.8;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+        
+        .calc-steps .highlight {
+            background: rgba(166,124,82,0.2);
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+        
+        /* Lineup slots */
+        .lineup-slot {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .lineup-slot:last-child { border-bottom: none; }
+        
+        .lineup-slot .number {
+            font-family: 'IBM Plex Mono', monospace;
+            font-weight: 700;
+            color: var(--accent-slate);
+            width: 24px;
+        }
+        
+        .lineup-slot select {
+            flex: 1;
+        }
+        
+        /* Matchup display */
+        .matchup-row {
+            display: flex;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .matchup-row:last-child { border-bottom: none; }
+        
+        .matchup-row .player-name {
+            flex: 1;
+            font-weight: 500;
+        }
+        
+        .matchup-row .stat {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 13px;
+            padding: 0 12px;
+        }
+        
+        /* Advantage indicators */
+        .advantage-hitter { 
+            background: rgba(74,124,89,0.1); 
+            border-left: 3px solid var(--accent-green);
+        }
+        
+        .advantage-pitcher { 
+            background: rgba(196,69,54,0.1); 
+            border-left: 3px solid var(--accent-red);
+        }
+        
+        .advantage-neutral {
+            border-left: 3px solid var(--border);
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="nav-content">
+            <a href="/" class="logo">MLB<span>_</span>MODEL</a>
+            <div class="nav-links">
+                <a href="/" {% if request.endpoint == 'index' %}class="active"{% endif %}>Dashboard</a>
+                <a href="/teams" {% if request.endpoint == 'teams' %}class="active"{% endif %}>Teams</a>
+                <a href="/matchup" {% if request.endpoint == 'matchup' %}class="active"{% endif %}>Matchup</a>
+                <a href="/roster-manager" {% if request.endpoint == 'roster_manager' %}class="active"{% endif %}>Rosters</a>
+                <a href="/results" {% if request.endpoint == 'results' %}class="active"{% endif %}>Results</a>
+            </div>
+        </div>
+    </nav>
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Roster Manager - MLB Model{% endblock %}
+{% block content %}
+<h1>ROSTER<span>_</span>MANAGER</h1>
+<p class="text-muted mb-24">Move players between teams for trades, free agency, and offseason prep.</p>
+
+<div class="grid grid-2 mb-24">
+    <div class="card">
+        <div class="card-header">
+            <h2>Select Team</h2>
+        </div>
+        <select id="teamSelect" onchange="loadTeamPlayers()">
+            <option value="">Choose a team</option>
+            {% for team in teams %}
+            <option value="{{ team.team_id }}">{{ team.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h2>Move To</h2>
+        </div>
+        <select id="targetTeam">
+            <option value="">Select destination team</option>
+            {% for team in teams %}
+            <option value="{{ team.team_id }}">{{ team.name }}</option>
+            {% endfor %}
+            <option value="FA">Free Agent (No Team)</option>
+        </select>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2>Players</h2>
+        <span class="text-muted" id="playerCount">Select a team to view players</span>
+    </div>
+    
+    <div id="playerList">
+        <p class="text-muted">Select a team above to see its players.</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentPlayers = [];
+
+async function loadTeamPlayers() {
+    const teamId = document.getElementById('teamSelect').value;
+    if (!teamId) return;
+    
+    try {
+        const resp = await fetch(`/api/team/${teamId}/roster`);
+        const data = await resp.json();
+        
+        currentPlayers = [...data.pitchers, ...data.hitters];
+        
+        document.getElementById('playerCount').textContent = `${currentPlayers.length} players`;
+        
+        let html = '<table><thead><tr><th></th><th>Name</th><th>Position</th><th>Key Stat</th><th>Action</th></tr></thead><tbody>';
+        
+        for (const p of currentPlayers) {
+            const stat = p.era ? `${p.era.toFixed(2)} ERA` : (p.wrc_plus ? `${Math.round(p.wrc_plus)} wRC+` : '-');
+            html += `
+                <tr>
+                    <td><input type="checkbox" class="player-check" value="${p.player_id}"></td>
+                    <td><strong>${p.name}</strong></td>
+                    <td>${p.position || (p.era ? 'P' : 'H')}</td>
+                    <td>${stat}</td>
+                    <td><button class="btn btn-sm btn-secondary" onclick="movePlayer('${p.player_id}')">Move</button></td>
+                </tr>
+            `;
+        }
+        
+        html += '</tbody></table>';
+        html += '<div class="mt-16"><button class="btn btn-hazel" onclick="moveSelected()">Move Selected Players</button></div>';
+        
+        document.getElementById('playerList').innerHTML = html;
+        
+    } catch (e) {
+        console.error('Error:', e);
+    }
+}
+
+async function movePlayer(playerId) {
+    const targetTeam = document.getElementById('targetTeam').value;
+    if (!targetTeam) {
+        alert('Select a destination team first');
+        return;
+    }
+    
+    try {
+        const resp = await fetch(`/api/player/${playerId}/move`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({team_id: targetTeam === 'FA' ? null : targetTeam})
+        });
+        
+        const result = await resp.json();
+        if (result.success) {
+            alert('Player moved successfully!');
+            loadTeamPlayers();
+        }
+    } catch (e) {
+        alert('Error moving player: ' + e.message);
+    }
+}
+
+async function moveSelected() {
+    const targetTeam = document.getElementById('targetTeam').value;
+    if (!targetTeam) {
+        alert('Select a destination team first');
+        return;
+    }
+    
+    const checkboxes = document.querySelectorAll('.player-check:checked');
+    if (checkboxes.length === 0) {
+        alert('Select at least one player');
+        return;
+    }
+    
+    for (const cb of checkboxes) {
+        await fetch(`/api/player/${cb.value}/move`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({team_id: targetTeam === 'FA' ? null : targetTeam})
+        });
+    }
+    
+    alert(`Moved ${checkboxes.length} players!`);
+    loadTeamPlayers();
+}
+</script>
+{% endblock %}

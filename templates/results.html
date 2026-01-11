@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Results - MLB Model{% endblock %}
+{% block content %}
+<h1>RESULTS<span>_</span>TRACKER</h1>
+
+<div class="card mb-24">
+    <div class="card-header">
+        <h2>Recent Predictions</h2>
+    </div>
+    
+    {% if predictions %}
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Matchup</th>
+                <th>Pred F5</th>
+                <th>Actual F5</th>
+                <th>Pred Full</th>
+                <th>Actual Full</th>
+                <th>Diff</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for p in predictions %}
+        {% set actual_f5 = (p.home_f5_actual or 0) + (p.away_f5_actual or 0) if p.home_f5_actual is not none else none %}
+        {% set diff = (p.f5_total - actual_f5)|abs if actual_f5 is not none else none %}
+        <tr>
+            <td>{{ p.game_date }}</td>
+            <td><strong>{{ p.away_team }}</strong> @ <strong>{{ p.home_team }}</strong></td>
+            <td class="mono">{{ p.f5_total }}</td>
+            <td class="mono">{{ actual_f5 if actual_f5 is not none else '-' }}</td>
+            <td class="mono">{{ p.full_total }}</td>
+            <td class="mono">
+                {% if p.home_final is not none %}
+                {{ (p.home_final or 0) + (p.away_final or 0) }}
+                {% else %}-{% endif %}
+            </td>
+            <td class="mono {% if diff is not none %}{% if diff <= 1 %}stat-good{% elif diff >= 3 %}stat-bad{% endif %}{% endif %}">
+                {{ "%+.1f"|format(p.f5_total - actual_f5) if actual_f5 is not none else '-' }}
+            </td>
+            <td>
+                {% if p.home_f5_actual is none %}
+                <button class="btn btn-sm btn-hazel" onclick="enterResult({{ p.prediction_id }})">Enter Result</button>
+                {% else %}
+                <span class="badge badge-green">Done</span>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted">No predictions yet. Go to the Matchup Builder to create one.</p>
+    {% endif %}
+</div>
+
+<!-- Result Entry Modal -->
+<div id="resultModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1000; display:flex; align-items:center; justify-content:center;">
+    <div class="card" style="width:400px; max-width:90%;">
+        <div class="card-header">
+            <h2>Enter Game Result</h2>
+        </div>
+        
+        <input type="hidden" id="resultPredictionId">
+        
+        <div class="mb-16">
+            <label>Away F5 Score</label>
+            <input type="number" id="awayF5Score" min="0" placeholder="0">
+        </div>
+        
+        <div class="mb-16">
+            <label>Home F5 Score</label>
+            <input type="number" id="homeF5Score" min="0" placeholder="0">
+        </div>
+        
+        <div class="mb-16">
+            <label>Away Final Score</label>
+            <input type="number" id="awayFinalScore" min="0" placeholder="0">
+        </div>
+        
+        <div class="mb-16">
+            <label>Home Final Score</label>
+            <input type="number" id="homeFinalScore" min="0" placeholder="0">
+        </div>
+        
+        <div style="display:flex; gap:12px;">
+            <button class="btn" onclick="saveResult()">Save Result</button>
+            <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function enterResult(predictionId) {
+    document.getElementById('resultPredictionId').value = predictionId;
+    document.getElementById('resultModal').style.display = 'flex';
+}
+
+function closeModal() {
+    document.getElementById('resultModal').style.display = 'none';
+}
+
+async function saveResult() {
+    const data = {
+        prediction_id: document.getElementById('resultPredictionId').value,
+        away_f5_actual: parseInt(document.getElementById('awayF5Score').value) || 0,
+        home_f5_actual: parseInt(document.getElementById('homeF5Score').value) || 0,
+        away_final: parseInt(document.getElementById('awayFinalScore').value) || 0,
+        home_final: parseInt(document.getElementById('homeFinalScore').value) || 0
+    };
+    
+    try {
+        const resp = await fetch('/api/result', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        
+        const result = await resp.json();
+        if (result.success) {
+            location.reload();
+        }
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+// Close modal on escape key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeModal();
+});
+</script>
+{% endblock %}

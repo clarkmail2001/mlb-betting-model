@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - MLB Model{% endblock %}
+{% block content %}
+<h1>DASH<span>BOARD</span></h1>
+
+<div class="grid grid-4 mb-24">
+    <div class="card stat-box">
+        <div class="value">{{ hitter_count }}</div>
+        <div class="label">Hitters</div>
+    </div>
+    <div class="card stat-box">
+        <div class="value">{{ pitcher_count }}</div>
+        <div class="label">Pitchers</div>
+    </div>
+    <div class="card stat-box">
+        <div class="value">{{ arsenal_count }}</div>
+        <div class="label">Pitch Arsenals</div>
+    </div>
+    <div class="card stat-box">
+        <div class="value">{{ recent_preds }}</div>
+        <div class="label">Predictions (7d)</div>
+    </div>
+</div>
+
+<div class="grid grid-2 mb-24">
+    <div class="card">
+        <div class="card-header">
+            <h2>Quick Actions</h2>
+        </div>
+        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <a href="/matchup" class="btn">New Projection</a>
+            <a href="/results" class="btn btn-secondary">Enter Results</a>
+            <button class="btn btn-hazel" onclick="importData()">Import CSV Data</button>
+        </div>
+        <div class="mt-16">
+            <p class="text-muted" style="font-size: 12px;">
+                <strong>Import:</strong> Place your CSV files in the mlb_model folder then click Import.
+                Required files: savant_pitchers.csv, fg_pitch_mix.csv, fg_hitters.csv, savant_hitters.csv, bp_hitters.csv
+            </p>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h2>Search Players</h2>
+        </div>
+        <input type="text" id="searchInput" placeholder="Type player name..." onkeyup="searchPlayers(this.value)">
+        <div id="searchResults" class="mt-8"></div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2>All Teams</h2>
+    </div>
+    <div class="grid grid-3">
+        {% set al_east = teams | selectattr('league', 'equalto', 'AL') | selectattr('division', 'equalto', 'East') | list %}
+        {% set al_central = teams | selectattr('league', 'equalto', 'AL') | selectattr('division', 'equalto', 'Central') | list %}
+        {% set al_west = teams | selectattr('league', 'equalto', 'AL') | selectattr('division', 'equalto', 'West') | list %}
+        {% set nl_east = teams | selectattr('league', 'equalto', 'NL') | selectattr('division', 'equalto', 'East') | list %}
+        {% set nl_central = teams | selectattr('league', 'equalto', 'NL') | selectattr('division', 'equalto', 'Central') | list %}
+        {% set nl_west = teams | selectattr('league', 'equalto', 'NL') | selectattr('division', 'equalto', 'West') | list %}
+        
+        <div>
+            <h3 class="mb-8" style="color: var(--accent-red);">AL East</h3>
+            {% for team in al_east %}
+            <div style="padding: 6px 0;"><a href="/team/{{ team.team_id }}">{{ team.name }}</a></div>
+            {% endfor %}
+            
+            <h3 class="mb-8 mt-16" style="color: var(--accent-red);">NL East</h3>
+            {% for team in nl_east %}
+            <div style="padding: 6px 0;"><a href="/team/{{ team.team_id }}">{{ team.name }}</a></div>
+            {% endfor %}
+        </div>
+        
+        <div>
+            <h3 class="mb-8" style="color: var(--accent-red);">AL Central</h3>
+            {% for team in al_central %}
+            <div style="padding: 6px 0;"><a href="/team/{{ team.team_id }}">{{ team.name }}</a></div>
+            {% endfor %}
+            
+            <h3 class="mb-8 mt-16" style="color: var(--accent-red);">NL Central</h3>
+            {% for team in nl_central %}
+            <div style="padding: 6px 0;"><a href="/team/{{ team.team_id }}">{{ team.name }}</a></div>
+            {% endfor %}
+        </div>
+        
+        <div>
+            <h3 class="mb-8" style="color: var(--accent-red);">AL West</h3>
+            {% for team in al_west %}
+            <div style="padding: 6px 0;"><a href="/team/{{ team.team_id }}">{{ team.name }}</a></div>
+            {% endfor %}
+            
+            <h3 class="mb-8 mt-16" style="color: var(--accent-red);">NL West</h3>
+            {% for team in nl_west %}
+            <div style="padding: 6px 0;"><a href="/team/{{ team.team_id }}">{{ team.name }}</a></div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function importData() {
+    if (!confirm('Import CSV files from the mlb_model folder?')) return;
+    
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = 'Importing...';
+    
+    try {
+        const resp = await fetch('/api/import', {method: 'POST'});
+        const result = await resp.json();
+        if (result.error) {
+            alert('Error: ' + result.error);
+        } else {
+            alert(`Import complete!\nPitchers: ${result.pitchers}\nHitters: ${result.hitters}\nPitch Arsenal: ${result.pitch_arsenal}`);
+            location.reload();
+        }
+    } catch (e) {
+        alert('Import failed: ' + e.message);
+    }
+    
+    btn.disabled = false;
+    btn.textContent = 'Import CSV Data';
+}
+
+let searchTimeout;
+async function searchPlayers(query) {
+    clearTimeout(searchTimeout);
+    const div = document.getElementById('searchResults');
+    
+    if (query.length < 2) {
+        div.innerHTML = '';
+        return;
+    }
+    
+    searchTimeout = setTimeout(async () => {
+        // Simple client-side search would need an API endpoint
+        // For now, just show a message
+        div.innerHTML = '<p class="text-muted">Use team pages to browse players</p>';
+    }, 300);
+}
+</script>
+{% endblock %}

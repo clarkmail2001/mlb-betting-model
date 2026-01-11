@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block title %}{{ player.name }} - MLB Model{% endblock %}
+{% block content %}
+<h1>{{ player.name | upper }}</h1>
+<p class="text-muted mb-24">
+    <a href="/team/{{ player.team_id }}">{{ player.team_id }}</a> | 
+    {{ player.position or ('Pitcher' if player_type == 'pitcher' else 'Hitter') }} |
+    {% if player_type == 'pitcher' %}Throws: {{ player.throws or 'R' }}{% else %}Bats: {{ player.bats or 'R' }}{% endif %}
+</p>
+
+{% if player_type == 'pitcher' %}
+<!-- PITCHER VIEW -->
+<div class="grid grid-4 mb-24">
+    <div class="card stat-box">
+        <div class="value">{{ "%.2f"|format(player.era) if player.era else '-' }}</div>
+        <div class="label">ERA</div>
+    </div>
+    <div class="card stat-box">
+        <div class="value">{{ "%.2f"|format(player.whip) if player.whip else '-' }}</div>
+        <div class="label">WHIP</div>
+    </div>
+    <div class="card stat-box">
+        <div class="value">{{ "%.1f"|format(player.k_rate) if player.k_rate else '-' }}%</div>
+        <div class="label">K%</div>
+    </div>
+    <div class="card stat-box">
+        <div class="value">{{ "%.1f"|format(player.war) if player.war else '-' }}</div>
+        <div class="label">WAR</div>
+    </div>
+</div>
+
+<div class="grid grid-2 mb-24">
+    <div class="card">
+        <div class="card-header">
+            <h2>Traditional Stats</h2>
+        </div>
+        <table>
+            <tr><td>ERA</td><td class="text-right mono">{{ "%.2f"|format(player.era) if player.era else '-' }}</td></tr>
+            <tr><td>WHIP</td><td class="text-right mono">{{ "%.2f"|format(player.whip) if player.whip else '-' }}</td></tr>
+            <tr><td>K%</td><td class="text-right mono">{{ "%.1f"|format(player.k_rate) if player.k_rate else '-' }}%</td></tr>
+            <tr><td>BB%</td><td class="text-right mono">{{ "%.1f"|format(player.bb_rate) if player.bb_rate else '-' }}%</td></tr>
+            <tr><td>FIP</td><td class="text-right mono">{{ "%.2f"|format(player.fip) if player.fip else '-' }}</td></tr>
+            <tr><td>xFIP</td><td class="text-right mono">{{ "%.2f"|format(player.xfip) if player.xfip else '-' }}</td></tr>
+            <tr><td>SIERA</td><td class="text-right mono">{{ "%.2f"|format(player.siera) if player.siera else '-' }}</td></tr>
+        </table>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h2>Statcast</h2>
+        </div>
+        <table>
+            <tr><td>xwOBA Against</td><td class="text-right mono">{{ "%.3f"|format(player.xwoba_against) if player.xwoba_against else '-' }}</td></tr>
+            <tr><td>xBA Against</td><td class="text-right mono">{{ "%.3f"|format(player.xba_against) if player.xba_against else '-' }}</td></tr>
+            <tr><td>Barrel% Against</td><td class="text-right mono">{{ "%.1f"|format(player.barrel_rate_against) if player.barrel_rate_against else '-' }}%</td></tr>
+            <tr><td>Hard Hit% Against</td><td class="text-right mono">{{ "%.1f"|format(player.hard_hit_against) if player.hard_hit_against else '-' }}%</td></tr>
+            <tr><td>Whiff%</td><td class="text-right mono">{{ "%.1f"|format(player.whiff_rate) if player.whiff_rate else '-' }}%</td></tr>
+            <tr><td>GB%</td><td class="text-right mono">{{ "%.1f"|format(player.gb_rate) if player.gb_rate else '-' }}%</td></tr>
+        </table>
+    </div>
+</div>
+
+<div class="card mb-24">
+    <div class="card-header">
+        <h2>Pitch Mix</h2>
+    </div>
+    <div style="display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px;">
+        {% if player.fb_pct %}<div class="badge badge-red" style="font-size: 14px; padding: 8px 16px;">Fastball: {{ "%.0f"|format(player.fb_pct) }}%</div>{% endif %}
+        {% if player.sl_pct %}<div class="badge badge-hazel" style="font-size: 14px; padding: 8px 16px;">Slider: {{ "%.0f"|format(player.sl_pct) }}%</div>{% endif %}
+        {% if player.ct_pct %}<div class="badge badge-slate" style="font-size: 14px; padding: 8px 16px;">Cutter: {{ "%.0f"|format(player.ct_pct) }}%</div>{% endif %}
+        {% if player.cb_pct %}<div class="badge badge-green" style="font-size: 14px; padding: 8px 16px;">Curveball: {{ "%.0f"|format(player.cb_pct) }}%</div>{% endif %}
+        {% if player.ch_pct %}<div class="badge" style="font-size: 14px; padding: 8px 16px; background: rgba(100,100,100,0.15);">Changeup: {{ "%.0f"|format(player.ch_pct) }}%</div>{% endif %}
+    </div>
+</div>
+
+{% if player.arsenal %}
+<div class="card">
+    <div class="card-header">
+        <h2>Pitch Arsenal (Savant)</h2>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>Pitch</th>
+                <th>Usage%</th>
+                <th>Whiff%</th>
+                <th>Put Away%</th>
+                <th>BA</th>
+                <th>wOBA</th>
+                <th>xwOBA</th>
+                <th>Hard Hit%</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for pitch in player.arsenal %}
+        <tr>
+            <td><strong>{{ pitch.pitch_name or pitch.pitch_type }}</strong></td>
+            <td>{{ "%.1f"|format(pitch.usage_pct) if pitch.usage_pct else '-' }}%</td>
+            <td class="{% if pitch.whiff_rate and pitch.whiff_rate > 30 %}stat-good{% endif %}">
+                {{ "%.1f"|format(pitch.whiff_rate) if pitch.whiff_rate else '-' }}%
+            </td>
+            <td>{{ "%.1f"|format(pitch.put_away_rate) if pitch.put_away_rate else '-' }}%</td>
+            <td>{{ "%.3f"|format(pitch.ba_against) if pitch.ba_against else '-' }}</td>
+            <td>{{ "%.3f"|format(pitch.woba_against) if pitch.woba_against else '-' }}</td>
+            <td>{{ "%.3f"|format(pitch.xwoba_against) if pitch.xwoba_against else '-' }}</td>
+            <td>{{ "%.1f"|format(pitch.hard_hit_rate) if pitch.hard_hit_rate else '-' }}%</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% else %}
+<!-- HITTER VIEW -->
+<div class="grid grid-4 mb-24">
+    <div class="card stat-box">
+        <div class="value">{{ player.wrc_plus|int if player.wrc_plus else '-' }}</div>
+        <div class="label">wRC+</div>
+    </div>
+    <div class="card stat-box">
+        <div class="value">{{ "%.3f"|format(player.xwoba) if player.xwoba else '-' }}</div>
+        <div class="label">xwOBA</div>
+    </div>
+    <div class="card stat-box">
+        <div class="value">{{ "%.1f"|format(player.barrel_rate) if player.barrel_rate else '-' }}%</div>
+        <div class="label">Barrel%</div>
+    </div>
+    <div class="card stat-box">
+        <div class="value">{{ "%.1f"|format(player.war) if player.war else '-' }}</div>
+        <div class="label">WAR</div>
+    </div>
+</div>
+
+<div class="grid grid-2 mb-24">
+    <div class="card">
+        <div class="card-header">
+            <h2>Slash Line</h2>
+        </div>
+        <table>
+            <tr><td>AVG</td><td class="text-right mono">{{ "%.3f"|format(player.batting_avg) if player.batting_avg else '-' }}</td></tr>
+            <tr><td>OBP</td><td class="text-right mono">{{ "%.3f"|format(player.obp) if player.obp else '-' }}</td></tr>
+            <tr><td>SLG</td><td class="text-right mono">{{ "%.3f"|format(player.slg) if player.slg else '-' }}</td></tr>
+            <tr><td>OPS</td><td class="text-right mono">{{ "%.3f"|format(player.ops) if player.ops else '-' }}</td></tr>
+            <tr><td>wOBA</td><td class="text-right mono">{{ "%.3f"|format(player.woba) if player.woba else '-' }}</td></tr>
+            <tr><td>wRC+</td><td class="text-right mono">{{ player.wrc_plus|int if player.wrc_plus else '-' }}</td></tr>
+            <tr><td>DRC+</td><td class="text-right mono">{{ player.drc_plus|int if player.drc_plus else '-' }}</td></tr>
+        </table>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h2>Statcast</h2>
+        </div>
+        <table>
+            <tr><td>xwOBA</td><td class="text-right mono">{{ "%.3f"|format(player.xwoba) if player.xwoba else '-' }}</td></tr>
+            <tr><td>Barrel%</td><td class="text-right mono">{{ "%.1f"|format(player.barrel_rate) if player.barrel_rate else '-' }}%</td></tr>
+            <tr><td>Hard Hit%</td><td class="text-right mono">{{ "%.1f"|format(player.hard_hit_rate) if player.hard_hit_rate else '-' }}%</td></tr>
+            <tr><td>Avg Exit Velo</td><td class="text-right mono">{{ "%.1f"|format(player.avg_exit_velo) if player.avg_exit_velo else '-' }} mph</td></tr>
+            <tr><td>K%</td><td class="text-right mono">{{ "%.1f"|format(player.k_rate) if player.k_rate else '-' }}%</td></tr>
+            <tr><td>BB%</td><td class="text-right mono">{{ "%.1f"|format(player.bb_rate) if player.bb_rate else '-' }}%</td></tr>
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2>Batted Ball</h2>
+    </div>
+    <table>
+        <tr><td>GB%</td><td class="text-right mono">{{ "%.1f"|format(player.gb_rate) if player.gb_rate else '-' }}%</td></tr>
+        <tr><td>FB%</td><td class="text-right mono">{{ "%.1f"|format(player.fb_rate) if player.fb_rate else '-' }}%</td></tr>
+        <tr><td>LD%</td><td class="text-right mono">{{ "%.1f"|format(player.ld_rate) if player.ld_rate else '-' }}%</td></tr>
+        <tr><td>Pull%</td><td class="text-right mono">{{ "%.1f"|format(player.pull_rate) if player.pull_rate else '-' }}%</td></tr>
+        <tr><td>ISO</td><td class="text-right mono">{{ "%.3f"|format(player.iso) if player.iso else '-' }}</td></tr>
+        <tr><td>BABIP</td><td class="text-right mono">{{ "%.3f"|format(player.babip) if player.babip else '-' }}</td></tr>
+    </table>
+</div>
+{% endif %}
+{% endblock %}

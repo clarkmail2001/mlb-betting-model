@@ -1,0 +1,341 @@
+{% extends "base.html" %}
+{% block title %}Matchup Builder - MLB Model{% endblock %}
+{% block content %}
+<h1>MATCHUP<span>_</span>BUILDER</h1>
+
+<div class="grid grid-2 mb-24">
+    <!-- AWAY TEAM -->
+    <div class="card">
+        <div class="card-header">
+            <h2>Away Team</h2>
+            <button class="btn btn-sm btn-secondary" onclick="autoFillLineup('away')">Auto-Fill</button>
+        </div>
+        
+        <div class="mb-16">
+            <label>Team</label>
+            <select id="awayTeam" onchange="loadTeamRoster('away')">
+                <option value="">Select Team</option>
+                {% for team in teams %}
+                <option value="{{ team.team_id }}">{{ team.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="mb-16">
+            <label>Starting Pitcher</label>
+            <select id="awayPitcher">
+                <option value="">Select pitcher first</option>
+            </select>
+        </div>
+        
+        <div>
+            <label>Lineup (1-9)</label>
+            <div id="awayLineup">
+                {% for i in range(1, 10) %}
+                <div class="lineup-slot">
+                    <span class="number">{{ i }}.</span>
+                    <select id="awayHitter{{ i }}" disabled>
+                        <option value="">Select team first</option>
+                    </select>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- HOME TEAM -->
+    <div class="card">
+        <div class="card-header">
+            <h2>Home Team</h2>
+            <button class="btn btn-sm btn-secondary" onclick="autoFillLineup('home')">Auto-Fill</button>
+        </div>
+        
+        <div class="mb-16">
+            <label>Team</label>
+            <select id="homeTeam" onchange="loadTeamRoster('home')">
+                <option value="">Select Team</option>
+                {% for team in teams %}
+                <option value="{{ team.team_id }}">{{ team.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="mb-16">
+            <label>Starting Pitcher</label>
+            <select id="homePitcher">
+                <option value="">Select pitcher first</option>
+            </select>
+        </div>
+        
+        <div>
+            <label>Lineup (1-9)</label>
+            <div id="homeLineup">
+                {% for i in range(1, 10) %}
+                <div class="lineup-slot">
+                    <span class="number">{{ i }}.</span>
+                    <select id="homeHitter{{ i }}" disabled>
+                        <option value="">Select team first</option>
+                    </select>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-24">
+    <div class="text-center">
+        <button class="btn" onclick="runProjection()" id="projectBtn" style="font-size: 16px; padding: 16px 48px;">
+            GENERATE PROJECTION
+        </button>
+    </div>
+</div>
+
+<!-- RESULTS -->
+<div id="resultsSection" class="hidden">
+    <div class="grid grid-2 mb-24">
+        <div class="card">
+            <div class="card-header">
+                <h2>F5 Projection (First 5 Innings)</h2>
+            </div>
+            <div class="grid grid-3">
+                <div class="stat-box">
+                    <div class="value" id="awayF5">-</div>
+                    <div class="label">Away Runs</div>
+                </div>
+                <div class="stat-box">
+                    <div class="value" id="homeF5">-</div>
+                    <div class="label">Home Runs</div>
+                </div>
+                <div class="stat-box">
+                    <div class="value" style="color: var(--accent-red);" id="f5Total">-</div>
+                    <div class="label">F5 Total</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h2>Full Game Projection</h2>
+            </div>
+            <div class="grid grid-3">
+                <div class="stat-box">
+                    <div class="value" id="awayFull">-</div>
+                    <div class="label">Away Runs</div>
+                </div>
+                <div class="stat-box">
+                    <div class="value" id="homeFull">-</div>
+                    <div class="label">Home Runs</div>
+                </div>
+                <div class="stat-box">
+                    <div class="value" style="color: var(--accent-red);" id="fullTotal">-</div>
+                    <div class="label">Full Total</div>
+                </div>
+            </div>
+            <div class="text-center mt-16">
+                <span class="badge badge-hazel" id="homeWinProb">-</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Matchup Details -->
+    <div class="grid grid-2 mb-24">
+        <div class="card">
+            <div class="card-header">
+                <h2>Away Lineup vs Home SP</h2>
+            </div>
+            <div id="awayMatchups"></div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h2>Home Lineup vs Away SP</h2>
+            </div>
+            <div id="homeMatchups"></div>
+        </div>
+    </div>
+    
+    <!-- Calculation Breakdown -->
+    <div class="card">
+        <div class="card-header">
+            <h2>Calculation Breakdown</h2>
+            <button class="btn btn-sm btn-secondary" onclick="toggleCalcDetails()">Show/Hide Details</button>
+        </div>
+        <div id="calcDetails" class="calc-steps"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const rosters = { away: null, home: null };
+
+async function loadTeamRoster(side) {
+    const teamId = document.getElementById(side + 'Team').value;
+    if (!teamId) return;
+    
+    try {
+        const resp = await fetch(`/api/team/${teamId}/roster`);
+        const data = await resp.json();
+        rosters[side] = data;
+        
+        // Populate pitchers dropdown
+        const pitcherSelect = document.getElementById(side + 'Pitcher');
+        pitcherSelect.innerHTML = '<option value="">Select SP</option>';
+        
+        for (const p of data.pitchers) {
+            const era = p.era ? p.era.toFixed(2) : '-';
+            pitcherSelect.innerHTML += `<option value="${p.player_id}">${p.name} (${era} ERA)</option>`;
+        }
+        
+        // Populate hitter dropdowns
+        for (let i = 1; i <= 9; i++) {
+            const select = document.getElementById(side + 'Hitter' + i);
+            select.disabled = false;
+            select.innerHTML = '<option value="">Select hitter</option>';
+            
+            for (const h of data.hitters) {
+                const wrc = h.wrc_plus ? Math.round(h.wrc_plus) : '-';
+                select.innerHTML += `<option value="${h.player_id}">${h.name} (${wrc} wRC+)</option>`;
+            }
+        }
+    } catch (e) {
+        console.error('Error loading roster:', e);
+    }
+}
+
+function autoFillLineup(side) {
+    const roster = rosters[side];
+    if (!roster || !roster.hitters) {
+        alert('Select a team first');
+        return;
+    }
+    
+    // Sort by wRC+ descending
+    const sorted = [...roster.hitters].sort((a, b) => (b.wrc_plus || 0) - (a.wrc_plus || 0));
+    
+    for (let i = 1; i <= 9 && i <= sorted.length; i++) {
+        document.getElementById(side + 'Hitter' + i).value = sorted[i-1].player_id;
+    }
+}
+
+async function runProjection() {
+    const btn = document.getElementById('projectBtn');
+    btn.disabled = true;
+    btn.textContent = 'Calculating...';
+    
+    // Gather data
+    const homePitcher = document.getElementById('homePitcher').value;
+    const awayPitcher = document.getElementById('awayPitcher').value;
+    
+    if (!homePitcher || !awayPitcher) {
+        alert('Please select both starting pitchers');
+        btn.disabled = false;
+        btn.textContent = 'GENERATE PROJECTION';
+        return;
+    }
+    
+    const homeLineup = [];
+    const awayLineup = [];
+    
+    for (let i = 1; i <= 9; i++) {
+        const h = document.getElementById('homeHitter' + i).value;
+        const a = document.getElementById('awayHitter' + i).value;
+        if (h) homeLineup.push(h);
+        if (a) awayLineup.push(a);
+    }
+    
+    if (homeLineup.length < 9 || awayLineup.length < 9) {
+        alert('Please fill all 9 lineup spots for both teams');
+        btn.disabled = false;
+        btn.textContent = 'GENERATE PROJECTION';
+        return;
+    }
+    
+    try {
+        const resp = await fetch('/api/project', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                home_pitcher_id: homePitcher,
+                away_pitcher_id: awayPitcher,
+                home_lineup: homeLineup,
+                away_lineup: awayLineup,
+                park_factor: rosters.home?.park_factor || 1.0
+            })
+        });
+        
+        const result = await resp.json();
+        
+        if (result.error) {
+            alert('Error: ' + result.error);
+        } else {
+            displayResults(result);
+        }
+    } catch (e) {
+        alert('Projection failed: ' + e.message);
+    }
+    
+    btn.disabled = false;
+    btn.textContent = 'GENERATE PROJECTION';
+}
+
+function displayResults(result) {
+    document.getElementById('resultsSection').classList.remove('hidden');
+    
+    // F5 stats
+    document.getElementById('awayF5').textContent = result.away_f5_runs;
+    document.getElementById('homeF5').textContent = result.home_f5_runs;
+    document.getElementById('f5Total').textContent = result.f5_total;
+    
+    // Full game stats
+    document.getElementById('awayFull').textContent = result.away_full_runs;
+    document.getElementById('homeFull').textContent = result.home_full_runs;
+    document.getElementById('fullTotal').textContent = result.full_total;
+    document.getElementById('homeWinProb').textContent = `Home Win: ${(result.home_win_prob * 100).toFixed(0)}%`;
+    
+    // Away matchups
+    const awayMatchupsDiv = document.getElementById('awayMatchups');
+    awayMatchupsDiv.innerHTML = renderMatchups(result.away_matchups);
+    
+    // Home matchups
+    const homeMatchupsDiv = document.getElementById('homeMatchups');
+    homeMatchupsDiv.innerHTML = renderMatchups(result.home_matchups);
+    
+    // Calculation details
+    const calcDiv = document.getElementById('calcDetails');
+    calcDiv.textContent = result.calculation_steps.join('\n');
+    
+    // Scroll to results
+    document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
+}
+
+function renderMatchups(matchups) {
+    if (!matchups || !matchups.length) return '<p class="text-muted">No data</p>';
+    
+    let html = '';
+    matchups.forEach((m, i) => {
+        const advClass = m.advantage === 'hitter' ? 'advantage-hitter' : 
+                        m.advantage === 'pitcher' ? 'advantage-pitcher' : 'advantage-neutral';
+        
+        html += `
+            <div class="matchup-row ${advClass}" style="padding-left: 12px;">
+                <span class="number" style="width: 24px; font-weight: 600; color: var(--accent-slate);">${i+1}.</span>
+                <span class="player-name">${m.hitter_name}</span>
+                <span class="stat">${m.projected_woba} wOBA</span>
+                <span class="badge ${m.advantage === 'hitter' ? 'badge-green' : m.advantage === 'pitcher' ? 'badge-red' : 'badge-slate'}">
+                    ${m.advantage}
+                </span>
+            </div>
+        `;
+    });
+    
+    return html;
+}
+
+function toggleCalcDetails() {
+    const div = document.getElementById('calcDetails');
+    div.style.display = div.style.display === 'none' ? 'block' : 'none';
+}
+</script>
+{% endblock %}

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}{{ team.name }} - MLB Model{% endblock %}
+{% block content %}
+<h1>{{ team.name | upper }}</h1>
+<p class="text-muted mb-24">{{ team.league }} {{ team.division }} | Park Factor: <strong>{{ team.park_factor }}</strong></p>
+
+<div class="grid grid-2 mb-24">
+    <div class="card">
+        <div class="card-header">
+            <h2>Pitchers</h2>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>ERA</th>
+                    <th>WHIP</th>
+                    <th>K%</th>
+                    <th>FB%</th>
+                    <th>WAR</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for p in pitchers %}
+            <tr onclick="location.href='/player/{{ p.player_id }}'" style="cursor:pointer;">
+                <td><strong>{{ p.name }}</strong></td>
+                <td class="{% if p.era and p.era < 3.50 %}stat-good{% elif p.era and p.era > 5.00 %}stat-bad{% endif %}">
+                    {{ "%.2f"|format(p.era) if p.era else '-' }}
+                </td>
+                <td>{{ "%.2f"|format(p.whip) if p.whip else '-' }}</td>
+                <td>{{ "%.1f"|format(p.k_rate) if p.k_rate else '-' }}%</td>
+                <td>{{ "%.0f"|format(p.fb_pct) if p.fb_pct else '-' }}%</td>
+                <td>{{ "%.1f"|format(p.war) if p.war else '-' }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="text-muted">No pitchers found. Import data first.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h2>Pitch Arsenal Summary</h2>
+        </div>
+        <p class="text-muted mb-8">Top pitch types used by team pitchers:</p>
+        {% for p in pitchers[:5] if p.fb_pct %}
+        <div class="mb-8">
+            <strong>{{ p.name }}</strong>
+            <div style="display: flex; gap: 8px; margin-top: 4px;">
+                {% if p.fb_pct %}<span class="badge badge-red">FB {{ "%.0f"|format(p.fb_pct) }}%</span>{% endif %}
+                {% if p.sl_pct %}<span class="badge badge-hazel">SL {{ "%.0f"|format(p.sl_pct) }}%</span>{% endif %}
+                {% if p.cb_pct %}<span class="badge badge-slate">CB {{ "%.0f"|format(p.cb_pct) }}%</span>{% endif %}
+                {% if p.ch_pct %}<span class="badge badge-green">CH {{ "%.0f"|format(p.ch_pct) }}%</span>{% endif %}
+            </div>
+        </div>
+        {% else %}
+        <p class="text-muted">No pitch mix data. Import fg_pitch_mix.csv.</p>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2>Hitters</h2>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>AVG</th>
+                <th>OBP</th>
+                <th>SLG</th>
+                <th>wOBA</th>
+                <th>xwOBA</th>
+                <th>wRC+</th>
+                <th>DRC+</th>
+                <th>K%</th>
+                <th>Barrel%</th>
+                <th>WAR</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for h in hitters %}
+        <tr onclick="location.href='/player/{{ h.player_id }}'" style="cursor:pointer;">
+            <td><strong>{{ h.name }}</strong></td>
+            <td>{{ "%.3f"|format(h.batting_avg) if h.batting_avg else '-' }}</td>
+            <td>{{ "%.3f"|format(h.obp) if h.obp else '-' }}</td>
+            <td>{{ "%.3f"|format(h.slg) if h.slg else '-' }}</td>
+            <td>{{ "%.3f"|format(h.woba) if h.woba else '-' }}</td>
+            <td>{{ "%.3f"|format(h.xwoba) if h.xwoba else '-' }}</td>
+            <td class="{% if h.wrc_plus and h.wrc_plus > 120 %}stat-good{% elif h.wrc_plus and h.wrc_plus < 80 %}stat-bad{% endif %}">
+                {{ h.wrc_plus|int if h.wrc_plus else '-' }}
+            </td>
+            <td>{{ h.drc_plus|int if h.drc_plus else '-' }}</td>
+            <td class="{% if h.k_rate and h.k_rate < 18 %}stat-good{% elif h.k_rate and h.k_rate > 28 %}stat-bad{% endif %}">
+                {{ "%.1f"|format(h.k_rate) if h.k_rate else '-' }}%
+            </td>
+            <td class="{% if h.barrel_rate and h.barrel_rate > 10 %}stat-good{% endif %}">
+                {{ "%.1f"|format(h.barrel_rate) if h.barrel_rate else '-' }}%
+            </td>
+            <td>{{ "%.1f"|format(h.war) if h.war else '-' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="11" class="text-muted">No hitters found. Import data first.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
