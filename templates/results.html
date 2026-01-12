@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Results - MLB Model{% endblock %}
+{% block content %}
+<h1>Results Tracker</h1>
+<div class="card">
+    <h2>Recent Predictions</h2>
+    {% if predictions %}
+    <table>
+        <thead><tr><th>Date</th><th>Matchup</th><th>F5 Total</th><th>Full Total</th></tr></thead>
+        <tbody>
+        {% for p in predictions %}
+        <tr>
+            <td>{{ p.game_date or p.created_at }}</td>
+            <td>{{ p.away_team }} @ {{ p.home_team }}</td>
+            <td>{{ p.f5_total }}</td>
+            <td>{{ p.full_total }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted">No predictions yet. Use the Matchup Builder to create one.</p>
+    {% endif %}
+</div>
+{% endblock %}

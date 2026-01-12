@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Roster Manager - MLB Model{% endblock %}
+{% block content %}
+<h1>Roster Manager</h1>
+<div class="card">
+    <h2>Move Players Between Teams</h2>
+    <p class="text-muted">Select a team to view and manage its roster.</p>
+    <select id="teamSelect" onchange="loadTeam()">
+        <option value="">Select Team</option>
+        {% for team in teams %}
+        <option value="{{ team.team_id }}">{{ team.name }}</option>
+        {% endfor %}
+    </select>
+    <div id="rosterList" style="margin-top: 20px;"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadTeam() {
+    const teamId = document.getElementById('teamSelect').value;
+    if (!teamId) return;
+    
+    const resp = await fetch(`/api/team/${teamId}/roster`);
+    const data = await resp.json();
+    
+    let html = '<table><thead><tr><th>Name</th><th>Position</th></tr></thead><tbody>';
+    [...data.pitchers, ...data.hitters].forEach(p => {
+        html += `<tr><td>${p.name}</td><td>${p.position || 'H'}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    
+    if (data.pitchers.length === 0 && data.hitters.length === 0) {
+        html = '<p class="text-muted">No players on this team. Import CSV data first.</p>';
+    }
+    
+    document.getElementById('rosterList').innerHTML = html;
+}
+</script>
+{% endblock %}

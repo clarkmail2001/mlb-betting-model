@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Teams - MLB Model{% endblock %}
+{% block content %}
+<h1>All Teams</h1>
+<div class="card">
+    <table>
+        <thead><tr><th>Team</th><th>League</th><th>Division</th><th>Park Factor</th></tr></thead>
+        <tbody>
+        {% for team in teams %}
+        <tr>
+            <td><a href="/team/{{ team.team_id }}">{{ team.name }}</a></td>
+            <td>{{ team.league }}</td>
+            <td>{{ team.division }}</td>
+            <td>{{ team.park_factor }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

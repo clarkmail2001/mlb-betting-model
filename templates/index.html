@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - MLB Model{% endblock %}
+{% block content %}
+<h1>MLB Betting Model</h1>
+
+<div class="grid grid-3" style="margin-bottom: 20px;">
+    <div class="card stat-box">
+        <div class="value">{{ player_count }}</div>
+        <div class="label">Players Loaded</div>
+    </div>
+    <div class="card stat-box">
+        <div class="value">30</div>
+        <div class="label">Teams</div>
+    </div>
+    <div class="card stat-box">
+        <div class="value">✓</div>
+        <div class="label">System Online</div>
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h2>Quick Actions</h2>
+        <a href="/matchup" class="btn">New Projection</a>
+        <a href="/teams" class="btn btn-secondary" style="margin-left: 10px;">View Teams</a>
+    </div>
+    <div class="card">
+        <h2>Status</h2>
+        <p>App is running successfully on Railway!</p>
+        <p class="text-muted" style="margin-top: 10px;">Import your CSV data to populate player stats.</p>
+    </div>
+</div>
+
+<div class="card" style="margin-top: 20px;">
+    <h2>All Teams</h2>
+    <div class="grid grid-3">
+        {% for div_name, div_teams in divisions.items() %}
+        <div>
+            <strong>{{ div_name }}</strong>
+            {% for team in div_teams %}
+            <div style="padding: 4px 0;"><a href="/team/{{ team.team_id }}">{{ team.name }}</a></div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

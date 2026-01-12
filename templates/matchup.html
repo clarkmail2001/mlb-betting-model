@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Matchup Builder - MLB Model{% endblock %}
+{% block content %}
+<h1>Matchup Builder</h1>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h2>Away Team</h2>
+        <label>Team</label>
+        <select id="awayTeam" onchange="loadRoster('away')">
+            <option value="">Select Team</option>
+            {% for team in teams %}
+            <option value="{{ team.team_id }}">{{ team.name }}</option>
+            {% endfor %}
+        </select>
+        <label>Starting Pitcher</label>
+        <select id="awayPitcher"><option value="">Select team first</option></select>
+        <div id="awayLineup"></div>
+    </div>
+    
+    <div class="card">
+        <h2>Home Team</h2>
+        <label>Team</label>
+        <select id="homeTeam" onchange="loadRoster('home')">
+            <option value="">Select Team</option>
+            {% for team in teams %}
+            <option value="{{ team.team_id }}">{{ team.name }}</option>
+            {% endfor %}
+        </select>
+        <label>Starting Pitcher</label>
+        <select id="homePitcher"><option value="">Select team first</option></select>
+        <div id="homeLineup"></div>
+    </div>
+</div>
+
+<div class="card" style="margin-top: 20px; text-align: center;">
+    <button class="btn" onclick="runProjection()" style="font-size: 18px; padding: 15px 40px;">GENERATE PROJECTION</button>
+</div>
+
+<div id="results" class="card" style="margin-top: 20px; display: none;">
+    <h2>Projection Results</h2>
+    <div class="grid grid-2">
+        <div class="stat-box">
+            <div class="value" id="f5Total">-</div>
+            <div class="label">F5 Total</div>
+        </div>
+        <div class="stat-box">
+            <div class="value" id="fullTotal">-</div>
+            <div class="label">Full Game Total</div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadRoster(side) {
+    const teamId = document.getElementById(side + 'Team').value;
+    if (!teamId) return;
+    
+    const resp = await fetch(`/api/team/${teamId}/roster`);
+    const data = await resp.json();
+    
+    const pitcherSelect = document.getElementById(side + 'Pitcher');
+    pitcherSelect.innerHTML = '<option value="">Select SP</option>';
+    data.pitchers.forEach(p => {
+        pitcherSelect.innerHTML += `<option value="${p.player_id}">${p.name}</option>`;
+    });
+    
+    let lineupHtml = '<label>Lineup</label>';
+    for (let i = 1; i <= 9; i++) {
+        lineupHtml += `<select id="${side}Hitter${i}"><option value="">Spot ${i}</option>`;
+        data.hitters.forEach(h => {
+            lineupHtml += `<option value="${h.player_id}">${h.name}</option>`;
+        });
+        lineupHtml += '</select>';
+    }
+    document.getElementById(side + 'Lineup').innerHTML = lineupHtml;
+}
+
+async function runProjection() {
+    const resp = await fetch('/api/project', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            home_pitcher_id: document.getElementById('homePitcher').value,
+            away_pitcher_id: document.getElementById('awayPitcher').value
+        })
+    });
+    const result = await resp.json();
+    
+    document.getElementById('f5Total').textContent = result.f5_total;
+    document.getElementById('fullTotal').textContent = result.full_total;
+    document.getElementById('results').style.display = 'block';
+}
+</script>
+{% endblock %}
