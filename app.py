@@ -256,8 +256,50 @@ def import_csvs():
                 cursor.execute("""
                     UPDATE hitter_stats SET drc_plus = ? WHERE player_id = ?
                 """, (safe_float(row.get('DRC+')), player_id))
-    
-    # 4. Import FanGraphs Pitch Mix (pitchers)
+
+
+        # 4. Import FanGraphs Pitchers (ERA, WHIP, K%, WAR, SIERA, xFIP)
+    if os.path.exists('fg_pitchers.csv'):
+        print("  Loading fg_pitchers.csv...")
+        with open('fg_pitchers.csv', 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                name = row.get('Name', row.get('NameASCII', ''))
+                if not name:
+                    continue
+                
+                player_id = make_player_id(name)
+                team = TEAM_MAP.get(row.get('Team', ''), 'FA')
+                
+                # Insert player if not exists
+                cursor.execute("""
+                    INSERT OR IGNORE INTO players (player_id, name, team_id, position, throws)
+                    VALUES (?, ?, ?, 'P', 'R')
+                """, (player_id, name, team))
+                
+                # Calculate derived stats
+                ip = safe_float(row.get('IP'), 0)
+                k9 = safe_float(row.get('K/9'))
+                bb9 = safe_float(row.get('BB/9'))
+                
+                # Convert K/9 and BB/9 to K% and BB% (approximate)
+                k_rate = (k9 / 9.0) * 100 if k9 else None
+                bb_rate = (bb9 / 9.0) * 100 if bb9 else None
+                
+                # Insert/update pitcher stats
+                cursor.execute("""
+                    INSERT OR REPLACE INTO pitcher_stats 
+                    (player_id, era, whip, k_rate, bb_rate, war)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    player_id,
+                    safe_float(row.get('ERA')),
+                    safe_float(row.get('WHIP')),
+                    k_rate,
+                    bb_rate,
+                    safe_float(row.get('WAR'))
+                ))
+    # 5. Import FanGraphs Pitch Mix (pitchers)
     if os.path.exists('fg_pitch_mix.csv'):
         print("  Loading fg_pitch_mix.csv...")
         with open('fg_pitch_mix.csv', 'r', encoding='utf-8-sig') as f:
@@ -288,7 +330,7 @@ def import_csvs():
                     safe_float(row.get('FBv'))
                 ))
     
-    # 5. Import Savant Pitchers (pitch arsenal with results)
+        # 6. Import Savant Pitchers (pitch arsenal with results)
     if os.path.exists('savant_pitchers.csv'):
         print("  Loading savant_pitchers.csv...")
         with open('savant_pitchers.csv', 'r', encoding='utf-8-sig') as f:
