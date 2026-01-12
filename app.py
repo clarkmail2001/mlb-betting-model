@@ -22,7 +22,7 @@ import math
 app = Flask(__name__)
 app.secret_key = 'mlb_model_2025'
 
-DB_PATH = 'data/baseball.db'
+DB_PATH = 'baseball.db'
 
 # ============================================================================
 # DATABASE FUNCTIONS
