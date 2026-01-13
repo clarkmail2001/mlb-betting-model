@@ -171,12 +171,6 @@ def import_csvs():
     conn = get_db()
     cursor = conn.cursor()
     
-    ## Check if already imported
-    c    #ursor.execute("SELECT COUNT(*) as cnt FROM players")
-    if cur    #sor.fetchone()['cnt'] > 0:
-        conn.cl        #ose()
-        return        #
-    
     print("Importing CSV data...")
     
     # 1. Import FanGraphs Hitters
