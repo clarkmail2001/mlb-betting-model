@@ -497,6 +497,42 @@ init_db()
 
 @app.route('/')
 def index():
+        conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT COUNT(*) as cnt FROM players")
+    player_count = cursor.fetchone()['cnt']
+    
+    cursor.execute("SELECT COUNT(*) as cnt FROM players WHERE position = 'P'")
+    pitcher_count = cursor.fetchone()['cnt']
+    
+    cursor.execute("SELECT COUNT(*) as cnt FROM players WHERE position != 'P'")
+    hitter_count = cursor.fetchone()['cnt']
+    
+    cursor.execute("SELECT COUNT(*) as cnt FROM pitch_arsenal")
+    arsenal_count = cursor.fetchone()['cnt']
+    
+    cursor.execute("SELECT * FROM teams ORDER BY league, division, name")
+    teams = [dict(r) for r in cursor.fetchall()]
+    
+    conn.close()
+    
+    divisions = {}
+    for t in teams:
+        key = f"{t['league']} {t['division']}"
+        if key not in divisions:
+            divisions[key] = []
+        divisions[key].append(t)
+    
+    return render_template('index.html', 
+                         player_count=player_count,
+                         pitcher_count=pitcher_count,
+                         hitter_count=hitter_count,
+                         arsenal_count=arsenal_count,
+                         teams=teams,
+                         divisions=divisions)
+
+
 
     @app.route('/admin/import-csvs')
 def admin_import():
