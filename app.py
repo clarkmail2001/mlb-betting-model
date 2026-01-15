@@ -299,11 +299,13 @@ def import_csvs():
             safe_float(row.get('FIP')),
             safe_float(row.get('xFIP')),
             safe_float(row.get('WAR'))
-        ))    if os.path.exists('fg_pitch_mix.csv'):
-        print("  Loading fg_pitch_mix.csv...")
+        ))
+        
+    # 5. Import FanGraphs Pitch Mix (pitchers)
+    if os.path.exists('fg_pitch_mix.csv'):
         with open('fg_pitch_mix.csv', 'r', encoding='utf-8-sig') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
+                        reader = csv.DictReader(f)
+                        for row in reader:
                 name = row.get('Name', row.get('NameASCII', ''))
                 if not name:
                     continue
