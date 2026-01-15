@@ -491,12 +491,21 @@ def project_game(home_pitcher, away_pitcher, home_lineup, away_lineup, park_fact
 
 # Initialize database and import data
 init_db()
-import_csvs()
+# import_csvs()
 
 # ============== ROUTES ==============
 
 @app.route('/')
 def index():
+
+    @app.route('/admin/import-csvs')
+def admin_import():
+    """Manually trigger CSV import"""
+    try:
+        import_csvs()
+        return jsonify({'success': True, 'message': 'CSV import completed'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
     conn = get_db()
     cursor = conn.cursor()
     
