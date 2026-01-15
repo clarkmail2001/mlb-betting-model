@@ -306,17 +306,17 @@ def import_csvs():
         with open('fg_pitch_mix.csv', 'r', encoding='utf-8-sig') as f:
                         reader = csv.DictReader(f)
                         for row in reader:
-                    name = row.get('Name', row.get('NameASCII', ''))
-                    if not name:
-                            continue
+                                name = row.get('Name', row.get('NameASCII', ''))
+                                if not name:
+                                            continue
                 
-                    player_id = make_player_id(name)
-                    team = TEAM_MAP.get(row.get('Team', ''), 'FA')
+                                player_id = make_player_id(name)
+                                team = TEAM_MAP.get(row.get('Team', ''), 'FA')
                 
-                    cursor.execute("""
-                            INSERT OR REPLACE INTO players (player_id, name, team_id, position, throws)
-                                VALUES (?, ?, ?, 'P', 'R')
-                        """, (player_id, name, team))
+                                cursor.execute("""
+                                            INSERT OR REPLACE INTO players (player_id, name, team_id, position, throws)
+                                                    VALUES (?, ?, ?, 'P', 'R')
+                                    """, (player_id, name, team))
                 
                 cursor.execute("""
                     INSERT OR REPLACE INTO pitcher_stats
