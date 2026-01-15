@@ -283,14 +283,14 @@ def import_csvs():
                 # Insert/update pitcher stats
                 cursor.execute("""
                     INSERT OR REPLACE INTO pitcher_stats 
-                    (player_id, era, whip, k_rate, bb_rate, war)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    (player_id, era, k_rate, bb_rate, fip, xfip, war)                    VALUES (?, ?,                    VALUES (?, ?, ?, ?, ?, ?, ?)
                 """, (
                     player_id,
                     safe_float(row.get('ERA')),
-                    safe_float(row.get('WHIP')),
                     k_rate,
                     bb_rate,
+                    safe_float(row.get('FIP')),
+                    safe_float(row.get('xFIP')),
                     safe_float(row.get('WAR'))
                 ))
     # 5. Import FanGraphs Pitch Mix (pitchers)
