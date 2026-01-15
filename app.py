@@ -498,9 +498,9 @@ init_db()
 @app.route('/')
 def index():
         conn = get_db()
-cursor = conn.cursor()
+    cursor = conn.cursor()
     
-    cursor.execute("SELECT COUNT(*) as cnt FROM players")
+cursor.execute("SELECT COUNT(*) as cnt FROM players")
     player_count = cursor.fetchone()['cnt']
     
     cursor.execute("SELECT COUNT(*) as cnt FROM players WHERE position = 'P'")
