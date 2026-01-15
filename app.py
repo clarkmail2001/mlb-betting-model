@@ -281,19 +281,25 @@ def import_csvs():
                 bb_rate = (bb9 / 9.0) * 100 if bb9 else None
                 
                 # Insert/update pitcher stats
-                cursor.execute("""
-                    INSERT OR REPLACE INTO pitcher_stats 
-                (player_id, era, k_rate, bb_rate, fip, xfip, war) VALUES (?, ?, ?, ?, ?, ?, ?)                """, (
-                    player_id,
-                    safe_float(row.get('ERA')),
-                    k_rate,
-                    bb_rate,
-                    safe_float(row.get('FIP')),
-                    safe_float(row.get('xFIP')),
-                    safe_float(row.get('WAR'))
-                ))
-    # 5. Import FanGraphs Pitch Mix (pitchers)
-    if os.path.exists('fg_pitch_mix.csv'):
+        # Insert/update pitcher stats - calculate WHIP from K/9 and BB/9
+        # WHIP ≈ (BB/9 + (9 - K/9 + BB/9) * 0.30) / 9 (rough estimate)
+        h9_estimate = max(0, 9 - k9 + bb9) if (k9 and bb9) else None
+        whip = ((bb9 or 0) + (h9_estimate or 9)) / 9 if h9_estimate is not None else None
+        
+        cursor.execute("""
+            INSERT OR REPLACE INTO pitcher_stats
+            (player_id, era, whip, k_rate, bb_rate, fip, xfip, war)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            player_id,
+            safe_float(row.get('ERA')),
+            whip,
+            k_rate,
+            bb_rate,
+            safe_float(row.get('FIP')),
+            safe_float(row.get('xFIP')),
+            safe_float(row.get('WAR'))
+        ))    if os.path.exists('fg_pitch_mix.csv'):
         print("  Loading fg_pitch_mix.csv...")
         with open('fg_pitch_mix.csv', 'r', encoding='utf-8-sig') as f:
             reader = csv.DictReader(f)
