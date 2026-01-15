@@ -283,8 +283,7 @@ def import_csvs():
                 # Insert/update pitcher stats
                 cursor.execute("""
                     INSERT OR REPLACE INTO pitcher_stats 
-                    (player_id, era, k_rate, bb_rate, fip, xfip, war)                    VALUES (?, ?,                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (
+                (player_id, era, k_rate, bb_rate, fip, xfip, war) VALUES (?, ?, ?, ?, ?, ?, ?)                """, (
                     player_id,
                     safe_float(row.get('ERA')),
                     k_rate,
