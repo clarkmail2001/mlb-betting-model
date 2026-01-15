@@ -318,7 +318,7 @@ def import_csvs():
                                                     VALUES (?, ?, ?, 'P', 'R')
                                     """, (player_id, name, team))
                 
-                cursor.execute("""
+                                cursor.execute("""
                     INSERT OR REPLACE INTO pitcher_stats
                     (player_id, fb_pct, sl_pct, cb_pct, ch_pct, fb_velo)
                     VALUES (?, ?, ?, ?, ?, ?)
