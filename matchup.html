@@ -1,0 +1,714 @@
+{% extends "base.html" %}
+
+{% block title %}Matchup Builder - MLB Predictions{% endblock %}
+
+{% block head %}
+<style>
+    .matchup-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 32px;
+    }
+    
+    @media (max-width: 1024px) {
+        .matchup-container {
+            grid-template-columns: 1fr;
+        }
+    }
+    
+    .team-section {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-light);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+    }
+    
+    .team-header {
+        padding: 20px;
+        border-bottom: 1px solid var(--border-light);
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+    
+    .team-header-logo {
+        width: 48px;
+        height: 48px;
+        object-fit: contain;
+    }
+    
+    .team-header-info h3 {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 4px;
+    }
+    
+    .team-header-info p {
+        font-size: 13px;
+        color: var(--text-muted);
+    }
+    
+    .section-title {
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+        padding: 16px 20px 8px;
+    }
+    
+    .pitcher-select {
+        padding: 0 20px 16px;
+    }
+    
+    .pitcher-card {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        background: var(--bg-tertiary);
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        transition: all 0.15s ease;
+        border: 2px solid transparent;
+    }
+    
+    .pitcher-card:hover {
+        background: var(--border-light);
+    }
+    
+    .pitcher-card.selected {
+        border-color: var(--text-primary);
+        background: var(--bg-secondary);
+    }
+    
+    .pitcher-card-info {
+        flex: 1;
+    }
+    
+    .pitcher-card-name {
+        font-weight: 600;
+        font-size: 14px;
+    }
+    
+    .pitcher-card-stats {
+        font-size: 12px;
+        color: var(--text-muted);
+        font-family: 'JetBrains Mono', monospace;
+    }
+    
+    .lineup-section {
+        padding: 0 20px 20px;
+    }
+    
+    .lineup-slots {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    
+    .hitter-pool {
+        padding: 16px 20px;
+        border-top: 1px solid var(--border-light);
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    
+    .hitter-pool-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-muted);
+        margin-bottom: 12px;
+    }
+    
+    .hitter-list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    
+    .hitter-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 12px;
+        background: var(--bg-tertiary);
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        transition: all 0.15s ease;
+        font-size: 13px;
+    }
+    
+    .hitter-item:hover {
+        background: var(--border-light);
+    }
+    
+    .hitter-item.in-lineup {
+        opacity: 0.4;
+        pointer-events: none;
+    }
+    
+    .hitter-item-name {
+        flex: 1;
+        font-weight: 500;
+    }
+    
+    .hitter-item-stats {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11px;
+        color: var(--text-muted);
+    }
+    
+    /* Results Panel */
+    .results-panel {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-light);
+        border-radius: var(--radius-lg);
+        padding: 24px;
+        margin-top: 32px;
+    }
+    
+    .results-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 24px;
+    }
+    
+    .results-title {
+        font-size: 18px;
+        font-weight: 600;
+    }
+    
+    .projection-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-bottom: 32px;
+    }
+    
+    .matchup-table {
+        margin-top: 24px;
+    }
+    
+    .matchup-table h4 {
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 12px;
+        color: var(--text-secondary);
+    }
+    
+    /* Math Breakdown */
+    .math-breakdown {
+        background: var(--bg-tertiary);
+        border-radius: var(--radius-md);
+        padding: 16px;
+        margin-top: 16px;
+    }
+    
+    .math-breakdown-title {
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+    }
+    
+    .math-breakdown-content {
+        display: none;
+    }
+    
+    .math-breakdown.expanded .math-breakdown-content {
+        display: block;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Matchup Builder</h1>
+    <p class="page-subtitle">Build lineups and get transparent projections</p>
+</div>
+
+<!-- Team Selection -->
+<div class="grid grid-2 mb-32">
+    <div class="form-group">
+        <label class="form-label">Away Team</label>
+        <select id="away-team" class="form-select" onchange="loadTeamRoster('away')">
+            <option value="">Select team...</option>
+            {% for team in teams %}
+            <option value="{{ team.team_id }}">{{ team.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-group">
+        <label class="form-label">Home Team</label>
+        <select id="home-team" class="form-select" onchange="loadTeamRoster('home')">
+            <option value="">Select team...</option>
+            {% for team in teams %}
+            <option value="{{ team.team_id }}">{{ team.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+</div>
+
+<!-- Matchup Builder -->
+<div class="matchup-container">
+    <!-- Away Team -->
+    <div class="team-section" id="away-section" style="display: none;">
+        <div class="team-header">
+            <img id="away-logo" src="" class="team-header-logo" onerror="this.style.display='none'">
+            <div class="team-header-info">
+                <h3 id="away-name">Away Team</h3>
+                <p id="away-park">Park Factor: -</p>
+            </div>
+        </div>
+        
+        <div class="section-title">Starting Pitcher</div>
+        <div class="pitcher-select" id="away-pitchers"></div>
+        
+        <div class="section-title">Lineup (click hitters below to add)</div>
+        <div class="lineup-section">
+            <div class="lineup-slots" id="away-lineup"></div>
+        </div>
+        
+        <div class="hitter-pool">
+            <div class="hitter-pool-title">Available Hitters</div>
+            <div class="hitter-list" id="away-hitters"></div>
+        </div>
+    </div>
+    
+    <!-- Home Team -->
+    <div class="team-section" id="home-section" style="display: none;">
+        <div class="team-header">
+            <img id="home-logo" src="" class="team-header-logo" onerror="this.style.display='none'">
+            <div class="team-header-info">
+                <h3 id="home-name">Home Team</h3>
+                <p id="home-park">Park Factor: -</p>
+            </div>
+        </div>
+        
+        <div class="section-title">Starting Pitcher</div>
+        <div class="pitcher-select" id="home-pitchers"></div>
+        
+        <div class="section-title">Lineup (click hitters below to add)</div>
+        <div class="lineup-section">
+            <div class="lineup-slots" id="home-lineup"></div>
+        </div>
+        
+        <div class="hitter-pool">
+            <div class="hitter-pool-title">Available Hitters</div>
+            <div class="hitter-list" id="home-hitters"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Run Projection Button -->
+<div class="text-center mt-24">
+    <button onclick="runProjection()" class="btn btn-primary" id="run-btn" disabled>
+        Run Projection
+    </button>
+</div>
+
+<!-- Results -->
+<div class="results-panel" id="results-panel" style="display: none;">
+    <div class="results-header">
+        <h2 class="results-title">Projection Results</h2>
+        <button onclick="saveProjection()" class="btn btn-sm btn-secondary">Save Prediction</button>
+    </div>
+    
+    <div class="projection-grid">
+        <div class="projection-box">
+            <div class="projection-label">F5 Away</div>
+            <div class="projection-value" id="f5-away">-</div>
+        </div>
+        <div class="projection-box">
+            <div class="projection-label">F5 Total</div>
+            <div class="projection-value" id="f5-total">-</div>
+        </div>
+        <div class="projection-box">
+            <div class="projection-label">F5 Home</div>
+            <div class="projection-value" id="f5-home">-</div>
+        </div>
+        <div class="projection-box">
+            <div class="projection-label">Full Away</div>
+            <div class="projection-value" id="full-away">-</div>
+        </div>
+        <div class="projection-box" style="background: var(--accent-red-light); border-color: var(--accent-red);">
+            <div class="projection-label" style="color: var(--accent-red);">Full Total</div>
+            <div class="projection-value" id="full-total" style="color: var(--accent-red);">-</div>
+        </div>
+        <div class="projection-box">
+            <div class="projection-label">Full Home</div>
+            <div class="projection-value" id="full-home">-</div>
+        </div>
+    </div>
+    
+    <!-- Pitcher Info -->
+    <div class="grid grid-2 mb-24">
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Away Pitcher</span>
+            </div>
+            <div class="card-body" id="away-pitcher-info"></div>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Home Pitcher</span>
+            </div>
+            <div class="card-body" id="home-pitcher-info"></div>
+        </div>
+    </div>
+    
+    <!-- Matchup Breakdowns -->
+    <div class="grid grid-2">
+        <div class="matchup-table">
+            <h4>Away Lineup vs Home Pitcher</h4>
+            <div class="table-wrapper">
+                <table id="away-matchups-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Hitter</th>
+                            <th class="text-right">Base wOBA</th>
+                            <th class="text-right">Proj wOBA</th>
+                            <th class="text-right">Exp Runs</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="matchup-table">
+            <h4>Home Lineup vs Away Pitcher</h4>
+            <div class="table-wrapper">
+                <table id="home-matchups-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Hitter</th>
+                            <th class="text-right">Base wOBA</th>
+                            <th class="text-right">Proj wOBA</th>
+                            <th class="text-right">Exp Runs</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Detailed Math (expandable) -->
+    <div class="math-breakdown mt-24" id="math-breakdown">
+        <div class="math-breakdown-title" onclick="toggleMathBreakdown()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+            Show Detailed Math Breakdown
+        </div>
+        <div class="math-breakdown-content" id="math-content"></div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// State
+const state = {
+    away: { team: null, pitchers: [], hitters: [], selectedPitcher: null, lineup: [] },
+    home: { team: null, pitchers: [], hitters: [], selectedPitcher: null, lineup: [] },
+    parkFactor: 1.0,
+    projection: null
+};
+
+// Load team roster
+async function loadTeamRoster(side) {
+    const teamId = document.getElementById(`${side}-team`).value;
+    if (!teamId) {
+        document.getElementById(`${side}-section`).style.display = 'none';
+        return;
+    }
+    
+    const data = await api(`/api/team/${teamId}/roster`);
+    
+    state[side].team = teamId;
+    state[side].pitchers = data.pitchers;
+    state[side].hitters = data.hitters;
+    state[side].selectedPitcher = null;
+    state[side].lineup = [];
+    
+    if (side === 'home') {
+        state.parkFactor = data.park_factor || 1.0;
+    }
+    
+    // Update UI
+    document.getElementById(`${side}-section`).style.display = 'block';
+    document.getElementById(`${side}-logo`).src = getTeamLogo(teamId);
+    document.getElementById(`${side}-name`).textContent = teamId;
+    document.getElementById(`${side}-park`).textContent = `Park Factor: ${data.park_factor?.toFixed(2) || '1.00'}`;
+    
+    renderPitchers(side);
+    renderHitters(side);
+    renderLineup(side);
+    updateRunButton();
+}
+
+// Render pitchers
+function renderPitchers(side) {
+    const container = document.getElementById(`${side}-pitchers`);
+    const pitchers = state[side].pitchers.filter(p => p.games_started > 0 || p.innings_pitched > 20);
+    
+    container.innerHTML = pitchers.slice(0, 10).map(p => `
+        <div class="pitcher-card ${state[side].selectedPitcher?.player_id === p.player_id ? 'selected' : ''}" 
+             onclick="selectPitcher('${side}', '${p.player_id}')">
+            <div class="pitcher-card-info">
+                <div class="pitcher-card-name">${p.name}</div>
+                <div class="pitcher-card-stats">
+                    ERA: ${p.era?.toFixed(2) || '-'} | 
+                    xFIP: ${p.xfip?.toFixed(2) || '-'} | 
+                    K/9: ${p.k9?.toFixed(1) || '-'} |
+                    IP: ${p.innings_pitched?.toFixed(0) || '-'}
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Select pitcher
+function selectPitcher(side, playerId) {
+    state[side].selectedPitcher = state[side].pitchers.find(p => p.player_id === playerId);
+    renderPitchers(side);
+    updateRunButton();
+}
+
+// Render hitters
+function renderHitters(side) {
+    const container = document.getElementById(`${side}-hitters`);
+    const inLineup = state[side].lineup.map(h => h.player_id);
+    
+    container.innerHTML = state[side].hitters.map(h => `
+        <div class="hitter-item ${inLineup.includes(h.player_id) ? 'in-lineup' : ''}" 
+             onclick="addToLineup('${side}', '${h.player_id}')">
+            <span class="hitter-item-name">${h.name}</span>
+            <span class="hitter-item-stats">
+                ${h.woba?.toFixed(3) || '-'} wOBA | 
+                ${h.wrc_plus?.toFixed(0) || '-'} wRC+
+            </span>
+        </div>
+    `).join('');
+}
+
+// Add hitter to lineup
+function addToLineup(side, playerId) {
+    if (state[side].lineup.length >= 9) return;
+    
+    const hitter = state[side].hitters.find(h => h.player_id === playerId);
+    if (hitter && !state[side].lineup.find(h => h.player_id === playerId)) {
+        state[side].lineup.push(hitter);
+        renderLineup(side);
+        renderHitters(side);
+        updateRunButton();
+    }
+}
+
+// Remove from lineup
+function removeFromLineup(side, index) {
+    state[side].lineup.splice(index, 1);
+    renderLineup(side);
+    renderHitters(side);
+    updateRunButton();
+}
+
+// Render lineup
+function renderLineup(side) {
+    const container = document.getElementById(`${side}-lineup`);
+    
+    let html = '';
+    for (let i = 0; i < 9; i++) {
+        const hitter = state[side].lineup[i];
+        if (hitter) {
+            html += `
+                <div class="lineup-slot filled">
+                    <div class="lineup-position">${i + 1}</div>
+                    <div class="lineup-player">
+                        <div class="lineup-player-name">${hitter.name}</div>
+                        <div class="lineup-player-stats">
+                            ${hitter.woba?.toFixed(3) || '-'} wOBA | 
+                            ${hitter.k_rate?.toFixed(1) || '-'}% K
+                        </div>
+                    </div>
+                    <button class="lineup-remove" onclick="removeFromLineup('${side}', ${i})">×</button>
+                </div>
+            `;
+        } else {
+            html += `
+                <div class="lineup-slot">
+                    <div class="lineup-position">${i + 1}</div>
+                    <div class="lineup-player">
+                        <div class="lineup-player-name text-muted">Click hitter below to add</div>
+                    </div>
+                </div>
+            `;
+        }
+    }
+    
+    container.innerHTML = html;
+}
+
+// Update run button
+function updateRunButton() {
+    const btn = document.getElementById('run-btn');
+    const canRun = state.away.selectedPitcher && 
+                   state.home.selectedPitcher && 
+                   state.away.lineup.length >= 1 && 
+                   state.home.lineup.length >= 1;
+    btn.disabled = !canRun;
+}
+
+// Run projection
+async function runProjection() {
+    const btn = document.getElementById('run-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading"></span> Calculating...';
+    
+    try {
+        const result = await api('/api/project', {
+            method: 'POST',
+            body: JSON.stringify({
+                home_pitcher_id: state.home.selectedPitcher.player_id,
+                away_pitcher_id: state.away.selectedPitcher.player_id,
+                home_lineup: state.home.lineup.map(h => h.player_id),
+                away_lineup: state.away.lineup.map(h => h.player_id),
+                park_factor: state.parkFactor
+            })
+        });
+        
+        state.projection = result;
+        displayResults(result);
+        
+    } catch (e) {
+        showToast('Projection failed: ' + e.message);
+    }
+    
+    btn.disabled = false;
+    btn.textContent = 'Run Projection';
+}
+
+// Display results
+function displayResults(result) {
+    document.getElementById('results-panel').style.display = 'block';
+    
+    // Main projections
+    document.getElementById('f5-away').textContent = result.projections.f5.away.toFixed(2);
+    document.getElementById('f5-home').textContent = result.projections.f5.home.toFixed(2);
+    document.getElementById('f5-total').textContent = result.projections.f5.total.toFixed(2);
+    document.getElementById('full-away').textContent = result.projections.full.away.toFixed(2);
+    document.getElementById('full-home').textContent = result.projections.full.home.toFixed(2);
+    document.getElementById('full-total').textContent = result.projections.full.total.toFixed(2);
+    
+    // Pitcher info
+    document.getElementById('away-pitcher-info').innerHTML = `
+        <p><strong>${result.away_pitcher.name}</strong></p>
+        <p class="text-sm text-muted">
+            Est. Innings: <span class="stat">${result.away_pitcher.estimated_innings}</span> |
+            ERA: <span class="stat">${result.away_pitcher.era?.toFixed(2) || '-'}</span> |
+            xFIP: <span class="stat">${result.away_pitcher.xfip?.toFixed(2) || '-'}</span>
+        </p>
+    `;
+    
+    document.getElementById('home-pitcher-info').innerHTML = `
+        <p><strong>${result.home_pitcher.name}</strong></p>
+        <p class="text-sm text-muted">
+            Est. Innings: <span class="stat">${result.home_pitcher.estimated_innings}</span> |
+            ERA: <span class="stat">${result.home_pitcher.era?.toFixed(2) || '-'}</span> |
+            xFIP: <span class="stat">${result.home_pitcher.xfip?.toFixed(2) || '-'}</span>
+        </p>
+    `;
+    
+    // Matchup tables
+    renderMatchupTable('away-matchups-table', result.away_matchups);
+    renderMatchupTable('home-matchups-table', result.home_matchups);
+    
+    // Math breakdown
+    renderMathBreakdown(result);
+    
+    // Scroll to results
+    document.getElementById('results-panel').scrollIntoView({ behavior: 'smooth' });
+}
+
+// Render matchup table
+function renderMatchupTable(tableId, matchups) {
+    const tbody = document.querySelector(`#${tableId} tbody`);
+    tbody.innerHTML = matchups.map((m, i) => `
+        <tr>
+            <td class="stat">${m.lineup_position}</td>
+            <td>${m.hitter_name}</td>
+            <td class="stat text-right">${m.baseline_woba.toFixed(3)}</td>
+            <td class="stat text-right ${m.projected_woba > 0.340 ? 'stat-good' : m.projected_woba < 0.290 ? 'stat-bad' : ''}">
+                ${m.projected_woba.toFixed(3)}
+            </td>
+            <td class="stat text-right">${m.expected_runs.toFixed(3)}</td>
+        </tr>
+    `).join('');
+}
+
+// Render math breakdown
+function renderMathBreakdown(result) {
+    const container = document.getElementById('math-content');
+    
+    // Show first hitter's detailed breakdown as example
+    if (result.away_matchups.length > 0) {
+        const m = result.away_matchups[0];
+        container.innerHTML = `
+            <p class="text-sm mb-16"><strong>Example: ${m.hitter_name} vs ${result.home_pitcher.name}</strong></p>
+            ${m.steps.map((step, i) => `
+                <div class="math-step">
+                    <div class="math-step-num">${i + 1}</div>
+                    <div class="math-step-content">
+                        <div class="math-step-name">${step.name}</div>
+                        <div class="math-step-formula">${step.formula}${step.values ? ' = ' + step.values : ''}</div>
+                    </div>
+                    <div class="math-step-result">${typeof step.result === 'number' ? step.result.toFixed(4) : step.result}</div>
+                </div>
+            `).join('')}
+        `;
+    }
+}
+
+// Toggle math breakdown
+function toggleMathBreakdown() {
+    document.getElementById('math-breakdown').classList.toggle('expanded');
+}
+
+// Save projection
+async function saveProjection() {
+    if (!state.projection) return;
+    
+    const result = await api('/api/save-prediction', {
+        method: 'POST',
+        body: JSON.stringify({
+            game_date: new Date().toISOString().split('T')[0],
+            home_team: state.home.team,
+            away_team: state.away.team,
+            home_pitcher: state.home.selectedPitcher.name,
+            away_pitcher: state.away.selectedPitcher.name,
+            home_pitcher_id: state.home.selectedPitcher.player_id,
+            away_pitcher_id: state.away.selectedPitcher.player_id,
+            f5_home: state.projection.projections.f5.home,
+            f5_away: state.projection.projections.f5.away,
+            f5_total: state.projection.projections.f5.total,
+            full_home: state.projection.projections.full.home,
+            full_away: state.projection.projections.full.away,
+            full_total: state.projection.projections.full.total,
+        })
+    });
+    
+    if (result.success) {
+        showToast('Prediction saved!');
+    }
+}
+</script>
+{% endblock %}

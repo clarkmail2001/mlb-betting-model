@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+
+{% block title %}{{ player.name }} - MLB Predictions{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display: flex; align-items: center; gap: 20px;">
+    {% if player.team %}
+    <img src="https://a.espncdn.com/i/teamlogos/mlb/500/{{ player.team.team_id|lower }}.png" 
+         alt="{{ player.team.name }}" 
+         style="width: 56px; height: 56px; object-fit: contain;"
+         onerror="this.style.display='none'">
+    {% endif %}
+    <div>
+        <h1 class="page-title">{{ player.name }}</h1>
+        <p class="page-subtitle">
+            {{ player_type|capitalize }} • 
+            {% if player.team %}
+                <a href="/team/{{ player.team.team_id }}" style="color: inherit;">{{ player.team.name }}</a>
+            {% else %}
+                Free Agent
+            {% endif %}
+            {% if player_type == 'pitcher' %}
+                • Throws {{ player.throws or 'R' }}
+            {% else %}
+                • Bats {{ player.bats or 'R' }}
+            {% endif %}
+        </p>
+    </div>
+</div>
+
+{% if player_type == 'pitcher' %}
+<!-- Pitcher Stats -->
+<div class="grid grid-2 mb-32">
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Traditional Stats</span>
+        </div>
+        <div class="card-body">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value">{{ "%.2f"|format(player.era) if player.era else '-' }}</div>
+                    <div class="stat-label">ERA</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ "%.2f"|format(player.xera) if player.xera else '-' }}</div>
+                    <div class="stat-label">xERA</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ "%.2f"|format(player.fip) if player.fip else '-' }}</div>
+                    <div class="stat-label">FIP</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ "%.2f"|format(player.xfip) if player.xfip else '-' }}</div>
+                    <div class="stat-label">xFIP</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ "%.1f"|format(player.innings_pitched) if player.innings_pitched else '-' }}</div>
+                    <div class="stat-label">IP</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ player.games_started if player.games_started else '-' }}</div>
+                    <div class="stat-label">GS</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Rate Stats</span>
+        </div>
+        <div class="card-body">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value">{{ "%.1f"|format(player.k9) if player.k9 else '-' }}</div>
+                    <div class="stat-label">K/9</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ "%.1f"|format(player.bb9) if player.bb9 else '-' }}</div>
+                    <div class="stat-label">BB/9</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ "%.1f"|format(player.hr9) if player.hr9 else '-' }}</div>
+                    <div class="stat-label">HR/9</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ "%.1f"|format(player.whiff_rate) if player.whiff_rate else '-' }}%</div>
+                    <div class="stat-label">Whiff%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ "%.3f"|format(player.xwoba_against) if player.xwoba_against else '-' }}</div>
+                    <div class="stat-label">xwOBA Against</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ "%.1f"|format(player.war) if player.war else '-' }}</div>
+                    <div class="stat-label">WAR</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Pitch Arsenal -->
+{% if player.arsenal %}
+<div class="card">
+    <div class="card-header">
+        <span class="card-title">Pitch Arsenal</span>
+    </div>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Pitch</th>
+                    <th class="text-right">Usage%</th>
+                    <th class="text-right">Whiff%</th>
+                    <th class="text-right">Put Away%</th>
+                    <th class="text-right">BA</th>
+                    <th class="text-right">SLG</th>
+                    <th class="text-right">wOBA</th>
+                    <th class="text-right">xwOBA</th>
+                    <th class="text-right">Hard Hit%</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pitch in player.arsenal %}
+                <tr>
+                    <td>
+                        <span class="font-mono" style="font-weight: 600;">{{ pitch.pitch_type }}</span>
+                        <span class="text-muted text-sm">{{ pitch.pitch_name }}</span>
+                    </td>
+                    <td class="stat text-right">{{ "%.1f"|format(pitch.usage_pct) if pitch.usage_pct else '-' }}%</td>
+                    <td class="stat text-right {% if pitch.whiff_rate and pitch.whiff_rate > 30 %}stat-good{% endif %}">
+                        {{ "%.1f"|format(pitch.whiff_rate) if pitch.whiff_rate else '-' }}%
+                    </td>
+                    <td class="stat text-right">{{ "%.1f"|format(pitch.put_away_rate) if pitch.put_away_rate else '-' }}%</td>
+                    <td class="stat text-right">{{ "%.3f"|format(pitch.ba_against) if pitch.ba_against else '-' }}</td>
+                    <td class="stat text-right">{{ "%.3f"|format(pitch.slg_against) if pitch.slg_against else '-' }}</td>
+                    <td class="stat text-right {% if pitch.woba_against and pitch.woba_against < 0.280 %}stat-good{% elif pitch.woba_against and pitch.woba_against > 0.350 %}stat-bad{% endif %}">
+                        {{ "%.3f"|format(pitch.woba_against) if pitch.woba_against else '-' }}
+                    </td>
+                    <td class="stat text-right">{{ "%.3f"|format(pitch.xwoba_against) if pitch.xwoba_against else '-' }}</td>
+                    <td class="stat text-right {% if pitch.hard_hit_rate and pitch.hard_hit_rate > 40 %}stat-bad{% endif %}">
+                        {{ "%.1f"|format(pitch.hard_hit_rate) if pitch.hard_hit_rate else '-' }}%
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% else %}
+<!-- Hitter Stats -->
+<div class="grid grid-2 mb-32">
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Slash Line & Counting</span>
+        </div>
+        <div class="card-body">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value">{{ "%.3f"|format(player.avg) if player.avg else '-' }}</div>
+                    <div class="stat-label">AVG</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ "%.3f"|format(player.obp) if player.obp else '-' }}</div>
+                    <div class="stat-label">OBP</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ "%.3f"|format(player.slg) if player.slg else '-' }}</div>
+                    <div class="stat-label">SLG</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ "%.3f"|format(player.ops) if player.ops else '-' }}</div>
+                    <div class="stat-label">OPS</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ player.hr if player.hr else '-' }}</div>
+                    <div class="stat-label">HR</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ player.pa if player.pa else '-' }}</div>
+                    <div class="stat-label">PA</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Advanced Metrics</span>
+        </div>
+        <div class="card-body">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value {% if player.woba and player.woba > 0.350 %}stat-good{% elif player.woba and player.woba < 0.290 %}stat-bad{% endif %}">
+                        {{ "%.3f"|format(player.woba) if player.woba else '-' }}
+                    </div>
+                    <div class="stat-label">wOBA</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ "%.3f"|format(player.xwoba) if player.xwoba else '-' }}</div>
+                    <div class="stat-label">xwOBA</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value {% if player.wrc_plus and player.wrc_plus > 120 %}stat-good{% elif player.wrc_plus and player.wrc_plus < 90 %}stat-bad{% endif %}">
+                        {{ player.wrc_plus|int if player.wrc_plus else '-' }}
+                    </div>
+                    <div class="stat-label">wRC+</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ player.drc_plus|int if player.drc_plus else '-' }}</div>
+                    <div class="stat-label">DRC+</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ "%.1f"|format(player.barrel_rate) if player.barrel_rate else '-' }}%</div>
+                    <div class="stat-label">Barrel%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value {% if player.war and player.war > 3 %}stat-good{% elif player.war and player.war < 0 %}stat-bad{% endif %}">
+                        {{ "%.1f"|format(player.war) if player.war else '-' }}
+                    </div>
+                    <div class="stat-label">WAR</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <span class="card-title">Plate Discipline</span>
+    </div>
+    <div class="card-body">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value {% if player.k_rate and player.k_rate > 25 %}stat-bad{% elif player.k_rate and player.k_rate < 15 %}stat-good{% endif %}">
+                    {{ "%.1f"|format(player.k_rate) if player.k_rate else '-' }}%
+                </div>
+                <div class="stat-label">K%</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value {% if player.bb_rate and player.bb_rate > 12 %}stat-good{% endif %}">
+                    {{ "%.1f"|format(player.bb_rate) if player.bb_rate else '-' }}%
+                </div>
+                <div class="stat-label">BB%</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ "%.3f"|format(player.iso) if player.iso else '-' }}</div>
+                <div class="stat-label">ISO</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ "%.3f"|format(player.babip) if player.babip else '-' }}</div>
+                <div class="stat-label">BABIP</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ "%.1f"|format(player.hard_hit_rate) if player.hard_hit_rate else '-' }}%</div>
+                <div class="stat-label">Hard Hit%</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ "%.1f"|format(player.avg_exit_velo) if player.avg_exit_velo else '-' }}</div>
+                <div class="stat-label">Avg EV</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

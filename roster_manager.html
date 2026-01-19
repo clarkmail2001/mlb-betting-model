@@ -1,0 +1,331 @@
+{% extends "base.html" %}
+
+{% block title %}Roster Manager - MLB Predictions{% endblock %}
+
+{% block head %}
+<style>
+    .roster-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+    }
+    
+    @media (max-width: 1024px) {
+        .roster-container {
+            grid-template-columns: 1fr;
+        }
+    }
+    
+    .roster-panel {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-light);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+    }
+    
+    .roster-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border-light);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    
+    .roster-header img {
+        width: 32px;
+        height: 32px;
+        object-fit: contain;
+    }
+    
+    .roster-header h3 {
+        font-size: 16px;
+        font-weight: 600;
+    }
+    
+    .roster-search {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border-light);
+    }
+    
+    .roster-list {
+        max-height: 500px;
+        overflow-y: auto;
+    }
+    
+    .roster-player {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 20px;
+        border-bottom: 1px solid var(--border-light);
+        cursor: grab;
+        transition: background 0.15s ease;
+    }
+    
+    .roster-player:hover {
+        background: var(--bg-tertiary);
+    }
+    
+    .roster-player.dragging {
+        opacity: 0.5;
+    }
+    
+    .roster-player.drag-over {
+        background: var(--accent-blue-light);
+    }
+    
+    .roster-player-pos {
+        width: 28px;
+        height: 28px;
+        background: var(--bg-tertiary);
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--text-muted);
+    }
+    
+    .roster-player-pos.pitcher {
+        background: var(--accent-red-light);
+        color: var(--accent-red);
+    }
+    
+    .roster-player-info {
+        flex: 1;
+    }
+    
+    .roster-player-name {
+        font-weight: 500;
+        font-size: 14px;
+    }
+    
+    .roster-player-stats {
+        font-size: 11px;
+        color: var(--text-muted);
+        font-family: 'JetBrains Mono', monospace;
+    }
+    
+    .roster-player-action {
+        opacity: 0;
+        transition: opacity 0.15s ease;
+    }
+    
+    .roster-player:hover .roster-player-action {
+        opacity: 1;
+    }
+    
+    .transfer-zone {
+        padding: 24px;
+        text-align: center;
+        border: 2px dashed var(--border-medium);
+        border-radius: var(--radius-md);
+        margin: 16px;
+        color: var(--text-muted);
+        transition: all 0.15s ease;
+    }
+    
+    .transfer-zone.drag-over {
+        border-color: var(--accent-blue);
+        background: var(--accent-blue-light);
+        color: var(--accent-blue);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Roster Manager</h1>
+    <p class="page-subtitle">Manage trades, free agent signings, and roster moves</p>
+</div>
+
+<!-- Team Selection -->
+<div class="grid grid-2 mb-32">
+    <div class="form-group">
+        <label class="form-label">Team 1</label>
+        <select id="team1-select" class="form-select" onchange="loadRoster(1)">
+            <option value="">Select team...</option>
+            {% for team in teams %}
+            <option value="{{ team.team_id }}">{{ team.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-group">
+        <label class="form-label">Team 2</label>
+        <select id="team2-select" class="form-select" onchange="loadRoster(2)">
+            <option value="">Select team...</option>
+            <option value="FA">Free Agents</option>
+            {% for team in teams %}
+            <option value="{{ team.team_id }}">{{ team.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+</div>
+
+<!-- Roster Panels -->
+<div class="roster-container">
+    <div class="roster-panel" id="team1-panel" style="display: none;">
+        <div class="roster-header">
+            <img id="team1-logo" src="" onerror="this.style.display='none'">
+            <h3 id="team1-name">Team 1</h3>
+        </div>
+        <div class="roster-search">
+            <input type="text" class="form-input" placeholder="Search players..." oninput="filterRoster(1, this.value)">
+        </div>
+        <div class="roster-list" id="team1-roster"></div>
+        <div class="transfer-zone" id="team1-drop" 
+             ondragover="handleDragOver(event)" 
+             ondragleave="handleDragLeave(event)" 
+             ondrop="handleDrop(event, 1)">
+            Drop player here to add to roster
+        </div>
+    </div>
+    
+    <div class="roster-panel" id="team2-panel" style="display: none;">
+        <div class="roster-header">
+            <img id="team2-logo" src="" onerror="this.style.display='none'">
+            <h3 id="team2-name">Team 2</h3>
+        </div>
+        <div class="roster-search">
+            <input type="text" class="form-input" placeholder="Search players..." oninput="filterRoster(2, this.value)">
+        </div>
+        <div class="roster-list" id="team2-roster"></div>
+        <div class="transfer-zone" id="team2-drop"
+             ondragover="handleDragOver(event)" 
+             ondragleave="handleDragLeave(event)" 
+             ondrop="handleDrop(event, 2)">
+            Drop player here to add to roster
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const rosters = { 1: [], 2: [] };
+const teamIds = { 1: null, 2: null };
+let draggedPlayer = null;
+let draggedFrom = null;
+
+async function loadRoster(panelNum) {
+    const teamId = document.getElementById(`team${panelNum}-select`).value;
+    if (!teamId) {
+        document.getElementById(`team${panelNum}-panel`).style.display = 'none';
+        return;
+    }
+    
+    teamIds[panelNum] = teamId;
+    
+    // Show panel
+    document.getElementById(`team${panelNum}-panel`).style.display = 'block';
+    document.getElementById(`team${panelNum}-name`).textContent = teamId === 'FA' ? 'Free Agents' : teamId;
+    
+    if (teamId !== 'FA') {
+        document.getElementById(`team${panelNum}-logo`).src = getTeamLogo(teamId);
+        document.getElementById(`team${panelNum}-logo`).style.display = 'block';
+    } else {
+        document.getElementById(`team${panelNum}-logo`).style.display = 'none';
+    }
+    
+    // Load roster
+    const data = await api(`/api/team/${teamId}/roster`);
+    rosters[panelNum] = [...data.pitchers, ...data.hitters];
+    
+    renderRoster(panelNum);
+}
+
+function renderRoster(panelNum, filter = '') {
+    const container = document.getElementById(`team${panelNum}-roster`);
+    const players = rosters[panelNum].filter(p => 
+        p.name.toLowerCase().includes(filter.toLowerCase())
+    );
+    
+    container.innerHTML = players.map(p => `
+        <div class="roster-player" 
+             draggable="true"
+             ondragstart="handleDragStart(event, '${p.player_id}', ${panelNum})"
+             ondragend="handleDragEnd(event)">
+            <div class="roster-player-pos ${p.position === 'P' ? 'pitcher' : ''}">
+                ${p.position === 'P' ? 'P' : 'H'}
+            </div>
+            <div class="roster-player-info">
+                <div class="roster-player-name">${p.name}</div>
+                <div class="roster-player-stats">
+                    ${p.position === 'P' 
+                        ? `ERA: ${p.era?.toFixed(2) || '-'} | WAR: ${p.war?.toFixed(1) || '-'}`
+                        : `wOBA: ${p.woba?.toFixed(3) || '-'} | WAR: ${p.war?.toFixed(1) || '-'}`
+                    }
+                </div>
+            </div>
+            <button class="btn btn-sm btn-secondary roster-player-action" 
+                    onclick="quickMove('${p.player_id}', ${panelNum})">
+                Move →
+            </button>
+        </div>
+    `).join('');
+}
+
+function filterRoster(panelNum, query) {
+    renderRoster(panelNum, query);
+}
+
+// Drag and drop handlers
+function handleDragStart(e, playerId, fromPanel) {
+    draggedPlayer = playerId;
+    draggedFrom = fromPanel;
+    e.target.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+}
+
+function handleDragEnd(e) {
+    e.target.classList.remove('dragging');
+    draggedPlayer = null;
+    draggedFrom = null;
+}
+
+function handleDragOver(e) {
+    e.preventDefault();
+    e.target.classList.add('drag-over');
+}
+
+function handleDragLeave(e) {
+    e.target.classList.remove('drag-over');
+}
+
+async function handleDrop(e, toPanel) {
+    e.preventDefault();
+    e.target.classList.remove('drag-over');
+    
+    if (!draggedPlayer || draggedFrom === toPanel) return;
+    
+    await movePlayer(draggedPlayer, toPanel);
+}
+
+async function quickMove(playerId, fromPanel) {
+    const toPanel = fromPanel === 1 ? 2 : 1;
+    if (!teamIds[toPanel]) {
+        showToast('Select a second team first');
+        return;
+    }
+    await movePlayer(playerId, toPanel);
+}
+
+async function movePlayer(playerId, toPanel) {
+    const newTeamId = teamIds[toPanel];
+    
+    const result = await api(`/api/player/${playerId}/move`, {
+        method: 'POST',
+        body: JSON.stringify({ team_id: newTeamId })
+    });
+    
+    if (result.success) {
+        showToast('Player moved!');
+        // Reload both rosters
+        await loadRoster(1);
+        await loadRoster(2);
+    }
+}
+</script>
+{% endblock %}
