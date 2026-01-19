@@ -1,25 +1,170 @@
 {% extends "base.html" %}
-{% block title %}Results - MLB Model{% endblock %}
+
+{% block title %}Results - MLB Predictions{% endblock %}
+
 {% block content %}
-<h1>Results Tracker</h1>
-<div class="card">
-    <h2>Recent Predictions</h2>
-    {% if predictions %}
-    <table>
-        <thead><tr><th>Date</th><th>Matchup</th><th>F5 Total</th><th>Full Total</th></tr></thead>
-        <tbody>
-        {% for p in predictions %}
-        <tr>
-            <td>{{ p.game_date or p.created_at }}</td>
-            <td>{{ p.away_team }} @ {{ p.home_team }}</td>
-            <td>{{ p.f5_total }}</td>
-            <td>{{ p.full_total }}</td>
-        </tr>
-        {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <p class="text-muted">No predictions yet. Use the Matchup Builder to create one.</p>
-    {% endif %}
+<div class="page-header">
+    <h1 class="page-title">Prediction Results</h1>
+    <p class="page-subtitle">Track accuracy and enter actual game scores</p>
 </div>
+
+<!-- Stats Summary -->
+<div class="stats-grid mb-32">
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.total or 0 }}</div>
+        <div class="stat-label">Total Predictions</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.with_results or 0 }}</div>
+        <div class="stat-label">With Results</div>
+    </div>
+</div>
+
+<!-- Predictions Table -->
+<div class="card">
+    <div class="card-header">
+        <span class="card-title">All Predictions</span>
+    </div>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Away</th>
+                    <th>Home</th>
+                    <th>Away Pitcher</th>
+                    <th>Home Pitcher</th>
+                    <th class="text-right">F5 Proj</th>
+                    <th class="text-right">Full Proj</th>
+                    <th class="text-right">Actual</th>
+                    <th class="text-right">Diff</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pred in predictions %}
+                <tr>
+                    <td class="stat">{{ pred.game_date or pred.created_at[:10] }}</td>
+                    <td>
+                        <span class="team-badge">
+                            <img src="https://a.espncdn.com/i/teamlogos/mlb/500/{{ pred.away_team|lower }}.png" 
+                                 class="team-logo" 
+                                 onerror="this.style.display='none'">
+                            <span class="team-abbr">{{ pred.away_team }}</span>
+                        </span>
+                    </td>
+                    <td>
+                        <span class="team-badge">
+                            <img src="https://a.espncdn.com/i/teamlogos/mlb/500/{{ pred.home_team|lower }}.png" 
+                                 class="team-logo" 
+                                 onerror="this.style.display='none'">
+                            <span class="team-abbr">{{ pred.home_team }}</span>
+                        </span>
+                    </td>
+                    <td class="text-sm">{{ pred.away_pitcher or '-' }}</td>
+                    <td class="text-sm">{{ pred.home_pitcher or '-' }}</td>
+                    <td class="stat text-right">
+                        {{ "%.1f"|format(pred.f5_away) if pred.f5_away else '-' }}-{{ "%.1f"|format(pred.f5_home) if pred.f5_home else '-' }}
+                        <span class="text-muted">({{ "%.1f"|format(pred.f5_total) if pred.f5_total else '-' }})</span>
+                    </td>
+                    <td class="stat text-right">
+                        {{ "%.1f"|format(pred.full_away) if pred.full_away else '-' }}-{{ "%.1f"|format(pred.full_home) if pred.full_home else '-' }}
+                        <span class="text-muted">({{ "%.1f"|format(pred.full_total) if pred.full_total else '-' }})</span>
+                    </td>
+                    <td class="stat text-right">
+                        {% if pred.actual_away is not none and pred.actual_home is not none %}
+                            {{ pred.actual_away }}-{{ pred.actual_home }}
+                            <span class="text-muted">({{ pred.actual_away + pred.actual_home }})</span>
+                        {% else %}
+                            <button class="btn btn-sm btn-secondary" onclick="enterResult({{ pred.id }})">
+                                Enter
+                            </button>
+                        {% endif %}
+                    </td>
+                    <td class="stat text-right">
+                        {% if pred.actual_away is not none and pred.actual_home is not none and pred.full_total %}
+                            {% set diff = (pred.actual_away + pred.actual_home) - pred.full_total %}
+                            <span class="{% if diff|abs < 1.5 %}stat-good{% elif diff|abs > 3 %}stat-bad{% endif %}">
+                                {{ "%+.1f"|format(diff) }}
+                            </span>
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td></td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="10" class="text-center text-muted" style="padding: 48px;">
+                        No predictions yet. <a href="/matchup">Create your first matchup</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Result Entry Modal -->
+<div id="result-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: none; align-items: center; justify-content: center;">
+    <div style="background: var(--bg-secondary); border-radius: var(--radius-lg); padding: 24px; max-width: 400px; width: 90%;">
+        <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 20px;">Enter Final Score</h3>
+        <input type="hidden" id="result-pred-id">
+        <div class="grid grid-2 gap-16 mb-24">
+            <div class="form-group mb-0">
+                <label class="form-label">Away Runs</label>
+                <input type="number" id="result-away" class="form-input" min="0" value="0">
+            </div>
+            <div class="form-group mb-0">
+                <label class="form-label">Home Runs</label>
+                <input type="number" id="result-home" class="form-input" min="0" value="0">
+            </div>
+        </div>
+        <div class="flex gap-8" style="justify-content: flex-end;">
+            <button onclick="closeResultModal()" class="btn btn-secondary">Cancel</button>
+            <button onclick="saveResult()" class="btn btn-primary">Save Result</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function enterResult(predId) {
+    document.getElementById('result-pred-id').value = predId;
+    document.getElementById('result-away').value = 0;
+    document.getElementById('result-home').value = 0;
+    document.getElementById('result-modal').style.display = 'flex';
+}
+
+function closeResultModal() {
+    document.getElementById('result-modal').style.display = 'none';
+}
+
+async function saveResult() {
+    const predId = document.getElementById('result-pred-id').value;
+    const awayRuns = parseInt(document.getElementById('result-away').value);
+    const homeRuns = parseInt(document.getElementById('result-home').value);
+    
+    const result = await api(`/api/prediction/${predId}/result`, {
+        method: 'POST',
+        body: JSON.stringify({
+            actual_away: awayRuns,
+            actual_home: homeRuns
+        })
+    });
+    
+    if (result.success) {
+        showToast('Result saved!');
+        closeResultModal();
+        location.reload();
+    }
+}
+
+// Close modal on background click
+document.getElementById('result-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeResultModal();
+});
+</script>
 {% endblock %}

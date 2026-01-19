@@ -1,47 +1,140 @@
 {% extends "base.html" %}
-{% block title %}Dashboard - MLB Model{% endblock %}
+
+{% block title %}Dashboard - MLB Predictions{% endblock %}
+
 {% block content %}
-<h1>MLB Betting Model</h1>
+<div class="page-header">
+    <h1 class="page-title">MLB Prediction Model</h1>
+    <p class="page-subtitle">2025 Season Data • Transparent Projections</p>
+</div>
 
-<div class="grid grid-3" style="margin-bottom: 20px;">
-    <div class="card stat-box">
-        <div class="value">{{ player_count }}</div>
-        <div class="label">Players Loaded</div>
+<!-- Stats Overview -->
+<div class="stats-grid mb-32">
+    <div class="stat-card">
+        <div class="stat-value">{{ pitcher_count }}</div>
+        <div class="stat-label">Pitchers</div>
     </div>
-    <div class="card stat-box">
-        <div class="value">30</div>
-        <div class="label">Teams</div>
+    <div class="stat-card">
+        <div class="stat-value">{{ hitter_count }}</div>
+        <div class="stat-label">Hitters</div>
     </div>
-    <div class="card stat-box">
-        <div class="value">✓</div>
-        <div class="label">System Online</div>
+    <div class="stat-card">
+        <div class="stat-value">{{ arsenal_count }}</div>
+        <div class="stat-label">Pitch Arsenal</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ prediction_count }}</div>
+        <div class="stat-label">Predictions</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">30</div>
+        <div class="stat-label">Teams</div>
     </div>
 </div>
 
-<div class="grid grid-2">
-    <div class="card">
-        <h2>Quick Actions</h2>
-        <a href="/matchup" class="btn">New Projection</a>
-        <a href="/teams" class="btn btn-secondary" style="margin-left: 10px;">View Teams</a>
-    </div>
-    <div class="card">
-        <h2>Status</h2>
-        <p>App is running successfully on Railway!</p>
-        <p class="text-muted" style="margin-top: 10px;">Import your CSV data to populate player stats.</p>
-    </div>
+<!-- Quick Actions -->
+<div class="flex gap-16 mb-32">
+    <a href="/matchup" class="btn btn-primary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+        New Matchup
+    </a>
+    <a href="/results" class="btn btn-secondary">View Results</a>
+    <button onclick="reimportData()" class="btn btn-secondary">Reimport CSVs</button>
 </div>
 
-<div class="card" style="margin-top: 20px;">
-    <h2>All Teams</h2>
-    <div class="grid grid-3">
-        {% for div_name, div_teams in divisions.items() %}
-        <div>
-            <strong>{{ div_name }}</strong>
-            {% for team in div_teams %}
-            <div style="padding: 4px 0;"><a href="/team/{{ team.team_id }}">{{ team.name }}</a></div>
-            {% endfor %}
-        </div>
+<!-- Teams by Division -->
+{% for division_name in ['AL East', 'AL Central', 'AL West', 'NL East', 'NL Central', 'NL West'] %}
+{% if division_name in divisions %}
+<div class="mb-32">
+    <div class="division-header">
+        <span class="division-title">{{ division_name }}</span>
+        <span class="division-badge">{{ divisions[division_name]|length }} teams</span>
+    </div>
+    
+    <div class="team-grid">
+        {% for team in divisions[division_name] %}
+        <a href="/team/{{ team.team_id }}" class="team-card">
+            <img src="https://a.espncdn.com/i/teamlogos/mlb/500/{{ team.team_id|lower }}.png" 
+                 alt="{{ team.name }}" 
+                 class="team-card-logo"
+                 onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 40 40%22><rect fill=%22%23e5e5e5%22 width=%2240%22 height=%2240%22/><text x=%2220%22 y=%2226%22 text-anchor=%22middle%22 font-size=%2212%22 fill=%22%23999%22>{{ team.team_id }}</text></svg>'">
+            <div class="team-card-info">
+                <div class="team-card-name">{{ team.name }}</div>
+                <div class="team-card-park">PF: {{ "%.2f"|format(team.park_factor) }}</div>
+            </div>
+        </a>
         {% endfor %}
     </div>
 </div>
+{% endif %}
+{% endfor %}
+
+<!-- Recent Predictions -->
+{% if recent_predictions %}
+<div class="card">
+    <div class="card-header">
+        <span class="card-title">Recent Predictions</span>
+        <a href="/results" class="btn btn-sm btn-secondary">View All</a>
+    </div>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Matchup</th>
+                    <th>F5 Total</th>
+                    <th>Full Total</th>
+                    <th>Actual</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pred in recent_predictions %}
+                <tr>
+                    <td class="stat">{{ pred.game_date or '-' }}</td>
+                    <td>
+                        <span class="font-mono">{{ pred.away_team }}</span>
+                        <span class="text-muted">@</span>
+                        <span class="font-mono">{{ pred.home_team }}</span>
+                    </td>
+                    <td class="stat">{{ "%.1f"|format(pred.f5_total) if pred.f5_total else '-' }}</td>
+                    <td class="stat">{{ "%.1f"|format(pred.full_total) if pred.full_total else '-' }}</td>
+                    <td class="stat">
+                        {% if pred.actual_home is not none and pred.actual_away is not none %}
+                            {{ pred.actual_away }}-{{ pred.actual_home }}
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function reimportData() {
+    if (!confirm('Reimport all CSV data? This may take a moment.')) return;
+    
+    showToast('Importing data...');
+    
+    try {
+        const result = await api('/admin/import-csvs');
+        if (result.success) {
+            showToast(`Imported: ${result.counts.pitchers} pitchers, ${result.counts.hitters} hitters`);
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            showToast('Import failed: ' + result.error);
+        }
+    } catch (e) {
+        showToast('Import failed: ' + e.message);
+    }
+}
+</script>
 {% endblock %}

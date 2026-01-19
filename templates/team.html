@@ -1,50 +1,139 @@
 {% extends "base.html" %}
-{% block title %}{{ team.name }} - MLB Model{% endblock %}
-{% block content %}
-<h1>{{ team.name }}</h1>
-<p class="text-muted">{{ team.league }} {{ team.division }} | Park Factor: {{ team.park_factor }}</p>
 
-<div class="grid grid-2" style="margin-top: 20px;">
-    <div class="card">
-        <h2>Pitchers</h2>
-        {% if pitchers %}
-        <table>
-            <thead><tr><th>Name</th><th>ERA</th><th>WHIP</th><th>K%</th></tr></thead>
-            <tbody>
-            {% for p in pitchers %}
-            <tr>
-                <td>{{ p.name }}</td>
-                <td>{{ "%.2f"|format(p.era) if p.era else '-' }}</td>
-                <td>{{ "%.2f"|format(p.whip) if p.whip else '-' }}</td>
-                <td>{{ "%.1f"|format(p.k_rate) if p.k_rate else '-' }}%</td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-        <p class="text-muted">No pitchers loaded. Import CSV data.</p>
-        {% endif %}
-    </div>
-    
-    <div class="card">
-        <h2>Hitters</h2>
-        {% if hitters %}
-        <table>
-            <thead><tr><th>Name</th><th>wOBA</th><th>wRC+</th><th>OPS</th></tr></thead>
-            <tbody>
-            {% for h in hitters %}
-            <tr>
-                <td>{{ h.name }}</td>
-                <td>{{ "%.3f"|format(h.woba) if h.woba else '-' }}</td>
-                <td>{{ h.wrc_plus|int if h.wrc_plus else '-' }}</td>
-                <td>{{ "%.3f"|format(h.ops) if h.ops else '-' }}</td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-        <p class="text-muted">No hitters loaded. Import CSV data.</p>
-        {% endif %}
+{% block title %}{{ team.name }} - MLB Predictions{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display: flex; align-items: center; gap: 20px;">
+    <img src="https://a.espncdn.com/i/teamlogos/mlb/500/{{ team.team_id|lower }}.png" 
+         alt="{{ team.name }}" 
+         style="width: 64px; height: 64px; object-fit: contain;"
+         onerror="this.style.display='none'">
+    <div>
+        <h1 class="page-title">{{ team.name }}</h1>
+        <p class="page-subtitle">{{ team.league }} {{ team.division }} • Park Factor: <span class="font-mono">{{ "%.2f"|format(team.park_factor) }}</span></p>
     </div>
 </div>
+
+<!-- Team Stats Summary -->
+<div class="stats-grid mb-32">
+    <div class="stat-card">
+        <div class="stat-value">{{ pitchers|length }}</div>
+        <div class="stat-label">Pitchers</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ hitters|length }}</div>
+        <div class="stat-label">Hitters</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ "%.2f"|format(team.park_factor) }}</div>
+        <div class="stat-label">Park Factor</div>
+    </div>
+</div>
+
+<!-- Pitchers Table -->
+<div class="card mb-32">
+    <div class="card-header">
+        <span class="card-title">Pitchers ({{ pitchers|length }})</span>
+    </div>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th class="text-right">ERA</th>
+                    <th class="text-right">xERA</th>
+                    <th class="text-right">FIP</th>
+                    <th class="text-right">xFIP</th>
+                    <th class="text-right">K/9</th>
+                    <th class="text-right">BB/9</th>
+                    <th class="text-right">IP</th>
+                    <th class="text-right">GS</th>
+                    <th class="text-right">WAR</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in pitchers %}
+                <tr>
+                    <td>
+                        <a href="/player/{{ p.player_id }}" class="player-link">{{ p.name }}</a>
+                    </td>
+                    <td class="stat text-right">{{ "%.2f"|format(p.era) if p.era else '-' }}</td>
+                    <td class="stat text-right">{{ "%.2f"|format(p.xera) if p.xera else '-' }}</td>
+                    <td class="stat text-right">{{ "%.2f"|format(p.fip) if p.fip else '-' }}</td>
+                    <td class="stat text-right">{{ "%.2f"|format(p.xfip) if p.xfip else '-' }}</td>
+                    <td class="stat text-right">{{ "%.1f"|format(p.k9) if p.k9 else '-' }}</td>
+                    <td class="stat text-right">{{ "%.1f"|format(p.bb9) if p.bb9 else '-' }}</td>
+                    <td class="stat text-right">{{ "%.1f"|format(p.innings_pitched) if p.innings_pitched else '-' }}</td>
+                    <td class="stat text-right">{{ p.games_started if p.games_started else '-' }}</td>
+                    <td class="stat text-right {% if p.war and p.war > 2 %}stat-good{% elif p.war and p.war < 0 %}stat-bad{% endif %}">
+                        {{ "%.1f"|format(p.war) if p.war else '-' }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="10" class="text-center text-muted" style="padding: 32px;">No pitchers found</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Hitters Table -->
+<div class="card">
+    <div class="card-header">
+        <span class="card-title">Hitters ({{ hitters|length }})</span>
+    </div>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th class="text-right">PA</th>
+                    <th class="text-right">AVG</th>
+                    <th class="text-right">OBP</th>
+                    <th class="text-right">SLG</th>
+                    <th class="text-right">wOBA</th>
+                    <th class="text-right">xwOBA</th>
+                    <th class="text-right">wRC+</th>
+                    <th class="text-right">K%</th>
+                    <th class="text-right">BB%</th>
+                    <th class="text-right">HR</th>
+                    <th class="text-right">WAR</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for h in hitters %}
+                <tr>
+                    <td>
+                        <a href="/player/{{ h.player_id }}" class="player-link">{{ h.name }}</a>
+                    </td>
+                    <td class="stat text-right">{{ h.pa if h.pa else '-' }}</td>
+                    <td class="stat text-right">{{ "%.3f"|format(h.avg) if h.avg else '-' }}</td>
+                    <td class="stat text-right">{{ "%.3f"|format(h.obp) if h.obp else '-' }}</td>
+                    <td class="stat text-right">{{ "%.3f"|format(h.slg) if h.slg else '-' }}</td>
+                    <td class="stat text-right {% if h.woba and h.woba > 0.350 %}stat-good{% elif h.woba and h.woba < 0.290 %}stat-bad{% endif %}">
+                        {{ "%.3f"|format(h.woba) if h.woba else '-' }}
+                    </td>
+                    <td class="stat text-right">{{ "%.3f"|format(h.xwoba) if h.xwoba else '-' }}</td>
+                    <td class="stat text-right {% if h.wrc_plus and h.wrc_plus > 120 %}stat-good{% elif h.wrc_plus and h.wrc_plus < 90 %}stat-bad{% endif %}">
+                        {{ h.wrc_plus|int if h.wrc_plus else '-' }}
+                    </td>
+                    <td class="stat text-right">{{ "%.1f"|format(h.k_rate) if h.k_rate else '-' }}%</td>
+                    <td class="stat text-right">{{ "%.1f"|format(h.bb_rate) if h.bb_rate else '-' }}%</td>
+                    <td class="stat text-right">{{ h.hr if h.hr else '-' }}</td>
+                    <td class="stat text-right {% if h.war and h.war > 3 %}stat-good{% elif h.war and h.war < 0 %}stat-bad{% endif %}">
+                        {{ "%.1f"|format(h.war) if h.war else '-' }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="12" class="text-center text-muted" style="padding: 32px;">No hitters found</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
 {% endblock %}
