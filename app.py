@@ -523,12 +523,15 @@ def calculate_matchup_detailed(pitcher, hitter, park_factor=1.0, weights=None, p
     breakdown['steps'].append({'name': 'Projected wOBA', 'formula': 'Baseline + All Adjustments',
         'values': f"{baseline:.3f} + {total_adj:.4f}", 'result': round(proj_woba, 3)})
     
-    # Step 7: Convert to Runs - THE KEY FIX
+    # Step 7: Convert to Runs
+    # Tighter bounds to produce realistic game totals (7-10 runs typical)
     woba_baseline = weights.get('woba_baseline', 0.290)
     woba_mult = weights.get('woba_to_runs_multiplier', 4.6)
-    runs_per_pa = max(0.02, min(0.25, (proj_woba - woba_baseline) * woba_mult))
+    raw_runs_per_pa = (proj_woba - woba_baseline) * woba_mult
+    runs_per_pa = max(0.05, min(0.18, raw_runs_per_pa))  # Tighter bounds
     breakdown['steps'].append({'name': 'Runs per PA', 'formula': f"(wOBA - {woba_baseline}) × {woba_mult}",
-        'values': f"({proj_woba:.3f} - {woba_baseline}) × {woba_mult}", 'result': round(runs_per_pa, 4)})
+        'values': f"({proj_woba:.3f} - {woba_baseline}) × {woba_mult} = {raw_runs_per_pa:.4f} → clamped to {runs_per_pa:.4f}", 
+        'result': round(runs_per_pa, 4)})
     
     breakdown['baseline_woba'] = round(baseline, 3)
     breakdown['projected_woba'] = round(proj_woba, 3)
@@ -596,20 +599,40 @@ def project_game(home_pitcher, away_pitcher, home_lineup, away_lineup, park_fact
         home_f5_runs += matchup['expected_runs']
     
     # Bullpen calculations
-    home_bp_ip = max(0, 9 - home_p_ip)
-    away_bp_ip = max(0, 9 - away_p_ip)
-    bp_runs_per_ip = LEAGUE_AVG['runs_per_game'] / 9 * 1.05
-    home_bp_runs = bp_runs_per_ip * home_bp_ip * park_factor
-    away_bp_runs = bp_runs_per_ip * away_bp_ip
+    # Away team faces home starter then home bullpen
+    # Home team faces away starter then away bullpen
+    home_bp_ip = max(0, 9 - home_p_ip)  # Innings home bullpen pitches
+    away_bp_ip = max(0, 9 - away_p_ip)  # Innings away bullpen pitches
     
-    home_full = home_f5_runs * (away_p_ip / 5.0) + home_bp_runs
-    away_full = away_f5_runs * (home_p_ip / 5.0) + away_bp_runs
+    # Bullpen runs rate (slightly worse than starters)
+    bp_runs_per_ip = LEAGUE_AVG['runs_per_game'] / 9 * 1.05  # ~0.525 runs/IP
+    
+    # Calculate runs/IP vs each starter from F5 data
+    away_runs_per_ip = away_f5_runs / 5.0 if away_f5_runs > 0 else 0.5
+    home_runs_per_ip = home_f5_runs / 5.0 if home_f5_runs > 0 else 0.5
+    
+    # Full game: runs vs starter for their outing + runs vs bullpen
+    # Away team faces home starter (Pivetta) then home bullpen
+    away_vs_starter = away_runs_per_ip * home_p_ip
+    away_vs_bp = bp_runs_per_ip * home_bp_ip * park_factor
+    away_full = away_vs_starter + away_vs_bp
+    
+    # Home team faces away starter (Schwellenbach) then away bullpen  
+    home_vs_starter = home_runs_per_ip * away_p_ip
+    home_vs_bp = bp_runs_per_ip * away_bp_ip * park_factor
+    home_full = home_vs_starter + home_vs_bp
     
     result['projections'] = {
         'f5': {'home': round(home_f5_runs, 2), 'away': round(away_f5_runs, 2), 'total': round(home_f5_runs + away_f5_runs, 2)},
         'full': {'home': round(home_full, 2), 'away': round(away_full, 2), 'total': round(home_full + away_full, 2)},
-        'bullpen': {'home_innings': round(home_bp_ip, 1), 'away_innings': round(away_bp_ip, 1),
-            'home_runs': round(home_bp_runs, 2), 'away_runs': round(away_bp_runs, 2)}
+        'bullpen': {
+            'home_bp_innings': round(home_bp_ip, 1), 
+            'away_bp_innings': round(away_bp_ip, 1),
+            'away_vs_starter': round(away_vs_starter, 2),
+            'away_vs_bp': round(away_vs_bp, 2),
+            'home_vs_starter': round(home_vs_starter, 2),
+            'home_vs_bp': round(home_vs_bp, 2)
+        }
     }
     return result
 
