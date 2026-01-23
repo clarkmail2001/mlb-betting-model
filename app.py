@@ -518,7 +518,7 @@ def import_csvs():
                     parts = name.split(',', 1)
                     name = f"{parts[1].strip()} {parts[0].strip()}"
                 player_id = make_player_id(name)
-                cursor.execute("INSERT INTO baserunning_stats (player_id, sprint_speed, hp_to_1b, bolts, competitive_runs) VALUES (?, ?, ?, ?, ?)",
+                cursor.execute("INSERT OR REPLACE INTO baserunning_stats (player_id, sprint_speed, hp_to_1b, bolts, competitive_runs) VALUES (?, ?, ?, ?, ?)",
                     (player_id, safe_float(row.get('sprint_speed')), safe_float(row.get('hp_to_1b')), safe_int(row.get('bolts')), safe_int(row.get('competitive_runs'))))
                 count += 1
             print(f"      Loaded {count} sprint speed rows")
