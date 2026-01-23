@@ -481,7 +481,7 @@ def import_csvs():
                     parts = name.split(',', 1)
                     name = f"{parts[1].strip()} {parts[0].strip()}"
                 player_id = make_player_id(name)
-                cursor.execute("INSERT INTO fielding_stats (player_id, position, outs_above_avg, fielding_runs_prevented) VALUES (?, ?, ?, ?)",
+                cursor.execute("INSERT OR REPLACE INTO fielding_stats (player_id, position, outs_above_avg, fielding_runs_prevented) VALUES (?, ?, ?, ?)",
                     (player_id, row.get('primary_pos_formatted', ''), safe_float(row.get('outs_above_average')), safe_float(row.get('fielding_runs_prevented'))))
                 count += 1
             print(f"      Loaded {count} fielding OAA rows")
@@ -534,7 +534,7 @@ def import_csvs():
                 name = row.get('Name', '')
                 if not name: continue
                 player_id = make_player_id(name)
-                cursor.execute("INSERT INTO hitter_splits (player_id, split_type, pa, bb_rate, k_rate, avg, obp, slg, ops, iso, woba, wrc_plus) VALUES (?, 'vs_LHP', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                cursor.execute("INSERT OR REPLACE INTO hitter_splits (player_id, split_type, pa, bb_rate, k_rate, avg, obp, slg, ops, iso, woba, wrc_plus) VALUES (?, 'vs_LHP', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (player_id, safe_int(row.get('PA')), safe_float(row.get('BB%')), safe_float(row.get('K%')), safe_float(row.get('AVG')), safe_float(row.get('OBP')), safe_float(row.get('SLG')), safe_float(row.get('OPS')), safe_float(row.get('ISO')), safe_float(row.get('wOBA')), safe_float(row.get('wRC+'))))
                 count += 1
             print(f"      Loaded {count} hitter vs LHP rows")
@@ -550,7 +550,7 @@ def import_csvs():
                 name = row.get('Name', '')
                 if not name: continue
                 player_id = make_player_id(name)
-                cursor.execute("INSERT INTO hitter_splits (player_id, split_type, pa, bb_rate, k_rate, avg, obp, slg, ops, iso, woba, wrc_plus) VALUES (?, 'vs_RHP', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                cursor.execute("INSERT OR REPLACE INTO hitter_splits (player_id, split_type, pa, bb_rate, k_rate, avg, obp, slg, ops, iso, woba, wrc_plus) VALUES (?, 'vs_RHP', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (player_id, safe_int(row.get('PA')), safe_float(row.get('BB%')), safe_float(row.get('K%')), safe_float(row.get('AVG')), safe_float(row.get('OBP')), safe_float(row.get('SLG')), safe_float(row.get('OPS')), safe_float(row.get('ISO')), safe_float(row.get('wOBA')), safe_float(row.get('wRC+'))))
                 count += 1
             print(f"      Loaded {count} hitter vs RHP rows")
@@ -566,7 +566,7 @@ def import_csvs():
                 name = row.get('Name', row.get('NameASCII', ''))
                 if not name: continue
                 player_id = make_player_id(name)
-                cursor.execute("INSERT INTO hitter_discipline (player_id, o_swing_pct, z_swing_pct, swing_pct, o_contact_pct, z_contact_pct, contact_pct, zone_pct, f_strike_pct, swstr_pct, csw_pct) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                cursor.execute("INSERT OR REPLACE INTO hitter_discipline (player_id, o_swing_pct, z_swing_pct, swing_pct, o_contact_pct, z_contact_pct, contact_pct, zone_pct, f_strike_pct, swstr_pct, csw_pct) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (player_id, safe_float(row.get('O-Swing%')), safe_float(row.get('Z-Swing%')), safe_float(row.get('Swing%')), safe_float(row.get('O-Contact%')), safe_float(row.get('Z-Contact%')), safe_float(row.get('Contact%')), safe_float(row.get('Zone%')), safe_float(row.get('F-Strike%')), safe_float(row.get('SwStr%')), safe_float(row.get('CSW%'))))
                 count += 1
             print(f"      Loaded {count} hitter discipline rows")
@@ -582,7 +582,7 @@ def import_csvs():
                 name = row.get('Name', row.get('NameASCII', ''))
                 if not name: continue
                 player_id = make_player_id(name)
-                cursor.execute("INSERT INTO hitter_batted_ball (player_id, gb_pct, fb_pct, ld_pct, hr_fb, pull_pct, cent_pct, oppo_pct, soft_pct, med_pct, hard_pct) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                cursor.execute("INSERT OR REPLACE INTO hitter_batted_ball (player_id, gb_pct, fb_pct, ld_pct, hr_fb, pull_pct, cent_pct, oppo_pct, soft_pct, med_pct, hard_pct) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (player_id, safe_float(row.get('GB%')), safe_float(row.get('FB%')), safe_float(row.get('LD%')), safe_float(row.get('HR/FB')), safe_float(row.get('Pull%')), safe_float(row.get('Cent%')), safe_float(row.get('Oppo%')), safe_float(row.get('Soft%')), safe_float(row.get('Med%')), safe_float(row.get('Hard%'))))
                 count += 1
             print(f"      Loaded {count} hitter batted ball rows")
@@ -598,7 +598,7 @@ def import_csvs():
                 name = row.get('Name', row.get('NameASCII', ''))
                 if not name: continue
                 player_id = make_player_id(name)
-                cursor.execute("INSERT INTO pitcher_discipline (player_id, o_swing_pct, z_swing_pct, swing_pct, o_contact_pct, z_contact_pct, contact_pct, zone_pct, f_strike_pct, swstr_pct, csw_pct) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                cursor.execute("INSERT OR REPLACE INTO pitcher_discipline (player_id, o_swing_pct, z_swing_pct, swing_pct, o_contact_pct, z_contact_pct, contact_pct, zone_pct, f_strike_pct, swstr_pct, csw_pct) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (player_id, safe_float(row.get('O-Swing%')), safe_float(row.get('Z-Swing%')), safe_float(row.get('Swing%')), safe_float(row.get('O-Contact%')), safe_float(row.get('Z-Contact%')), safe_float(row.get('Contact%')), safe_float(row.get('Zone%')), safe_float(row.get('F-Strike%')), safe_float(row.get('SwStr%')), safe_float(row.get('CSW%'))))
                 count += 1
             print(f"      Loaded {count} pitcher discipline rows")
@@ -617,7 +617,7 @@ def import_csvs():
                     parts = name.split(',', 1)
                     name = f"{parts[1].strip()} {parts[0].strip()}"
                 player_id = make_player_id(name)
-                cursor.execute("INSERT INTO pitch_movement (player_id, pitch_type, pitch_name, avg_speed, break_z, break_z_induced, break_x, pitches_thrown) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                cursor.execute("INSERT OR REPLACE INTO pitch_movement (player_id, pitch_type, pitch_name, avg_speed, break_z, break_z_induced, break_x, pitches_thrown) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                     (player_id, row.get('pitch_type', ''), row.get('pitch_type_name', ''), safe_float(row.get('avg_speed')), safe_float(row.get('pitcher_break_z')), safe_float(row.get('pitcher_break_z_induced')), safe_float(row.get('pitcher_break_x')), safe_int(row.get('pitches_thrown'))))
                 count += 1
             print(f"      Loaded {count} pitch movement rows")
