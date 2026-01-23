@@ -148,6 +148,44 @@ def init_db():
         f5_total REAL, full_home REAL, full_away REAL, full_total REAL,
         actual_home INTEGER, actual_away INTEGER, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
     
+    # NEW v3.0 TABLES
+    cursor.execute("""CREATE TABLE IF NOT EXISTS catcher_stats (
+        player_id TEXT PRIMARY KEY, framing_runs REAL, blocking_runs REAL,
+        blocks_above_avg REAL, pop_time_2b REAL, pop_time_3b REAL, max_arm_strength REAL)""")
+    
+    cursor.execute("""CREATE TABLE IF NOT EXISTS fielding_stats (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, player_id TEXT, position TEXT,
+        outs_above_avg REAL, fielding_runs_prevented REAL, arm_strength REAL)""")
+    
+    cursor.execute("""CREATE TABLE IF NOT EXISTS baserunning_stats (
+        player_id TEXT PRIMARY KEY, sprint_speed REAL, hp_to_1b REAL,
+        bolts INTEGER, competitive_runs INTEGER)""")
+    
+    cursor.execute("""CREATE TABLE IF NOT EXISTS hitter_splits (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, player_id TEXT, split_type TEXT,
+        pa INTEGER, bb_rate REAL, k_rate REAL, avg REAL, obp REAL, slg REAL,
+        ops REAL, iso REAL, woba REAL, wrc_plus REAL)""")
+    
+    cursor.execute("""CREATE TABLE IF NOT EXISTS hitter_discipline (
+        player_id TEXT PRIMARY KEY, o_swing_pct REAL, z_swing_pct REAL, swing_pct REAL,
+        o_contact_pct REAL, z_contact_pct REAL, contact_pct REAL, zone_pct REAL,
+        f_strike_pct REAL, swstr_pct REAL, csw_pct REAL)""")
+    
+    cursor.execute("""CREATE TABLE IF NOT EXISTS hitter_batted_ball (
+        player_id TEXT PRIMARY KEY, gb_pct REAL, fb_pct REAL, ld_pct REAL,
+        hr_fb REAL, pull_pct REAL, cent_pct REAL, oppo_pct REAL,
+        soft_pct REAL, med_pct REAL, hard_pct REAL)""")
+    
+    cursor.execute("""CREATE TABLE IF NOT EXISTS pitcher_discipline (
+        player_id TEXT PRIMARY KEY, o_swing_pct REAL, z_swing_pct REAL, swing_pct REAL,
+        o_contact_pct REAL, z_contact_pct REAL, contact_pct REAL, zone_pct REAL,
+        f_strike_pct REAL, swstr_pct REAL, csw_pct REAL)""")
+    
+    cursor.execute("""CREATE TABLE IF NOT EXISTS pitch_movement (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, player_id TEXT, pitch_type TEXT,
+        pitch_name TEXT, avg_speed REAL, break_z REAL, break_z_induced REAL,
+        break_x REAL, pitches_thrown INTEGER)""")
+    
     cursor.execute("""CREATE TABLE IF NOT EXISTS model_weights (
         id INTEGER PRIMARY KEY AUTOINCREMENT, weight_name TEXT UNIQUE,
         weight_value REAL, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
@@ -341,39 +379,22 @@ def import_csvs():
                         (data['xwoba'] / data['usage'], pid))
             print(f"      Loaded {count} pitch arsenal rows")
     
-    # 7. Hitter vs Pitch Type - how each hitter performs against each pitch type
-    # This completes the arsenal matchup: pitcher throws X pitch, hitter hits Y wOBA vs that pitch
-    hvp_file = None
-    for fname in ['savant_hitters_all_csv.csv', 'savant_hitters_pitch_arsenal.csv']:
-        if os.path.exists(fname):
-            hvp_file = fname
-            break
-    
-    if hvp_file:
-        print(f"\n[7/7] Loading {hvp_file}...")
+    # 7. Hitter vs Pitch Type (NEW!)
+    if os.path.exists('savant_hitters_pitch_arsenal.csv'):
+        print("\n[7/7] Loading savant_hitters_pitch_arsenal.csv...")
         cursor.execute("DELETE FROM hitter_vs_pitch")
-        with open(hvp_file, 'r', encoding='utf-8-sig') as f:
+        with open('savant_hitters_pitch_arsenal.csv', 'r', encoding='utf-8-sig') as f:
             reader = csv.DictReader(f)
             count = 0
             for row in reader:
-                # Handle "last_name, first_name" format from Baseball Savant export
-                name_field = row.get('last_name, first_name', '')
-                if name_field and ',' in name_field:
-                    parts = name_field.split(',', 1)
-                    last = parts[0].strip()
-                    first = parts[1].strip() if len(parts) > 1 else ''
-                    name = f"{first} {last}".strip()
-                else:
-                    # Fallback for other formats
-                    first = row.get('first_name', row.get('name_first', ''))
-                    last = row.get('last_name', row.get('name_last', ''))
-                    if not first and not last:
-                        full = row.get('player_name', row.get('name', ''))
-                        if full:
-                            parts = full.split(' ', 1)
-                            first, last = (parts[0], parts[1]) if len(parts) > 1 else (parts[0], '')
-                    name = f"{first} {last}".strip()
-                
+                first = row.get('first_name', row.get('name_first', ''))
+                last = row.get('last_name', row.get('name_last', ''))
+                if not first and not last:
+                    full = row.get('player_name', row.get('name', ''))
+                    if full:
+                        parts = full.split(' ', 1)
+                        first, last = (parts[0], parts[1]) if len(parts) > 1 else (parts[0], '')
+                name = f"{first} {last}".strip()
                 if not name or name == ' ': continue
                 player_id = make_player_id(name)
                 pitch_type = row.get('pitch_type', '')
@@ -387,10 +408,226 @@ def import_csvs():
                 count += 1
             print(f"      Loaded {count} hitter vs pitch rows")
     else:
-        print("\n[7/7] Hitter vs pitch type file not found")
-        print("      Add savant_hitters_all_csv.csv from Baseball Savant pitch arsenal stats (batter view)")
+        print("\n[7/7] savant_hitters_pitch_arsenal.csv not found")
+    
+    # 8. Catcher Framing
+    if os.path.exists('catcher-framing.csv'):
+        print("\n[8] Loading catcher-framing.csv...")
+        with open('catcher-framing.csv', 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            count = 0
+            for row in reader:
+                name = row.get('name', '')
+                if not name: continue
+                player_id = make_player_id(name)
+                cursor.execute("INSERT OR REPLACE INTO catcher_stats (player_id, framing_runs) VALUES (?, ?)",
+                    (player_id, safe_float(row.get('rv_tot'))))
+                count += 1
+            print(f"      Loaded {count} catcher framing rows")
+    
+    # 9. Catcher Blocking
+    if os.path.exists('catcher_blocking.csv'):
+        print("\n[9] Loading catcher_blocking.csv...")
+        with open('catcher_blocking.csv', 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            count = 0
+            for row in reader:
+                name = row.get('player_name', '')
+                if not name: continue
+                if ',' in name:
+                    parts = name.split(',', 1)
+                    name = f"{parts[1].strip()} {parts[0].strip()}"
+                player_id = make_player_id(name)
+                cursor.execute("UPDATE catcher_stats SET blocking_runs=?, blocks_above_avg=? WHERE player_id=?",
+                    (safe_float(row.get('catcher_blocking_runs')), safe_float(row.get('blocks_above_average')), player_id))
+                if cursor.rowcount == 0:
+                    cursor.execute("INSERT INTO catcher_stats (player_id, blocking_runs, blocks_above_avg) VALUES (?, ?, ?)",
+                        (player_id, safe_float(row.get('catcher_blocking_runs')), safe_float(row.get('blocks_above_average'))))
+                count += 1
+            print(f"      Loaded {count} catcher blocking rows")
+    
+    # 10. Catcher Poptime
+    if os.path.exists('poptime.csv'):
+        print("\n[10] Loading poptime.csv...")
+        with open('poptime.csv', 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            count = 0
+            for row in reader:
+                name = row.get('entity_name', '')
+                if not name: continue
+                if ',' in name:
+                    parts = name.split(',', 1)
+                    name = f"{parts[1].strip()} {parts[0].strip()}"
+                player_id = make_player_id(name)
+                cursor.execute("UPDATE catcher_stats SET pop_time_2b=?, pop_time_3b=?, max_arm_strength=? WHERE player_id=?",
+                    (safe_float(row.get('pop_2b_sba')), safe_float(row.get('pop_3b_sba')), safe_float(row.get('maxeff_arm_2b_3b_sba')), player_id))
+                if cursor.rowcount == 0:
+                    cursor.execute("INSERT INTO catcher_stats (player_id, pop_time_2b, pop_time_3b, max_arm_strength) VALUES (?, ?, ?, ?)",
+                        (player_id, safe_float(row.get('pop_2b_sba')), safe_float(row.get('pop_3b_sba')), safe_float(row.get('maxeff_arm_2b_3b_sba'))))
+                count += 1
+            print(f"      Loaded {count} catcher poptime rows")
+    
+    # 11. Fielding OAA
+    if os.path.exists('outs_above_average.csv'):
+        print("\n[11] Loading outs_above_average.csv...")
+        cursor.execute("DELETE FROM fielding_stats")
+        with open('outs_above_average.csv', 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            count = 0
+            for row in reader:
+                name = row.get('last_name, first_name', '')
+                if not name: continue
+                if ',' in name:
+                    parts = name.split(',', 1)
+                    name = f"{parts[1].strip()} {parts[0].strip()}"
+                player_id = make_player_id(name)
+                cursor.execute("INSERT INTO fielding_stats (player_id, position, outs_above_avg, fielding_runs_prevented) VALUES (?, ?, ?, ?)",
+                    (player_id, row.get('primary_pos_formatted', ''), safe_float(row.get('outs_above_average')), safe_float(row.get('fielding_runs_prevented'))))
+                count += 1
+            print(f"      Loaded {count} fielding OAA rows")
+    
+    # 12. Arm Strength
+    if os.path.exists('arm_strength.csv'):
+        print("\n[12] Loading arm_strength.csv...")
+        with open('arm_strength.csv', 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            count = 0
+            for row in reader:
+                name = row.get('fielder_name', '')
+                if not name: continue
+                if ',' in name:
+                    parts = name.split(',', 1)
+                    name = f"{parts[1].strip()} {parts[0].strip()}"
+                player_id = make_player_id(name)
+                arm = safe_float(row.get('arm_overall')) or safe_float(row.get('max_arm_strength'))
+                cursor.execute("UPDATE fielding_stats SET arm_strength=? WHERE player_id=?", (arm, player_id))
+                count += 1
+            print(f"      Updated {count} arm strength rows")
+    
+    # 13. Sprint Speed
+    if os.path.exists('sprint_speed.csv'):
+        print("\n[13] Loading sprint_speed.csv...")
+        cursor.execute("DELETE FROM baserunning_stats")
+        with open('sprint_speed.csv', 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            count = 0
+            for row in reader:
+                name = row.get('last_name, first_name', '')
+                if not name: continue
+                if ',' in name:
+                    parts = name.split(',', 1)
+                    name = f"{parts[1].strip()} {parts[0].strip()}"
+                player_id = make_player_id(name)
+                cursor.execute("INSERT INTO baserunning_stats (player_id, sprint_speed, hp_to_1b, bolts, competitive_runs) VALUES (?, ?, ?, ?, ?)",
+                    (player_id, safe_float(row.get('sprint_speed')), safe_float(row.get('hp_to_1b')), safe_int(row.get('bolts')), safe_int(row.get('competitive_runs'))))
+                count += 1
+            print(f"      Loaded {count} sprint speed rows")
+    
+    # 14. Hitter Splits vs LHP
+    if os.path.exists('Splits_Leaderboard_Data_vs_LHP.csv'):
+        print("\n[14] Loading Splits vs LHP...")
+        cursor.execute("DELETE FROM hitter_splits WHERE split_type='vs_LHP'")
+        with open('Splits_Leaderboard_Data_vs_LHP.csv', 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            count = 0
+            for row in reader:
+                name = row.get('Name', '')
+                if not name: continue
+                player_id = make_player_id(name)
+                cursor.execute("INSERT INTO hitter_splits (player_id, split_type, pa, bb_rate, k_rate, avg, obp, slg, ops, iso, woba, wrc_plus) VALUES (?, 'vs_LHP', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (player_id, safe_int(row.get('PA')), safe_float(row.get('BB%')), safe_float(row.get('K%')), safe_float(row.get('AVG')), safe_float(row.get('OBP')), safe_float(row.get('SLG')), safe_float(row.get('OPS')), safe_float(row.get('ISO')), safe_float(row.get('wOBA')), safe_float(row.get('wRC+'))))
+                count += 1
+            print(f"      Loaded {count} hitter vs LHP rows")
+    
+    # 15. Hitter Splits vs RHP
+    if os.path.exists('Splits_Leaderboard_Data_vs_RHP.csv'):
+        print("\n[15] Loading Splits vs RHP...")
+        cursor.execute("DELETE FROM hitter_splits WHERE split_type='vs_RHP'")
+        with open('Splits_Leaderboard_Data_vs_RHP.csv', 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            count = 0
+            for row in reader:
+                name = row.get('Name', '')
+                if not name: continue
+                player_id = make_player_id(name)
+                cursor.execute("INSERT INTO hitter_splits (player_id, split_type, pa, bb_rate, k_rate, avg, obp, slg, ops, iso, woba, wrc_plus) VALUES (?, 'vs_RHP', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (player_id, safe_int(row.get('PA')), safe_float(row.get('BB%')), safe_float(row.get('K%')), safe_float(row.get('AVG')), safe_float(row.get('OBP')), safe_float(row.get('SLG')), safe_float(row.get('OPS')), safe_float(row.get('ISO')), safe_float(row.get('wOBA')), safe_float(row.get('wRC+'))))
+                count += 1
+            print(f"      Loaded {count} hitter vs RHP rows")
+    
+    # 16. Hitter Discipline
+    if os.path.exists('fangraphs-leaderboards.csv'):
+        print("\n[16] Loading hitter discipline...")
+        cursor.execute("DELETE FROM hitter_discipline")
+        with open('fangraphs-leaderboards.csv', 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            count = 0
+            for row in reader:
+                name = row.get('Name', row.get('NameASCII', ''))
+                if not name: continue
+                player_id = make_player_id(name)
+                cursor.execute("INSERT INTO hitter_discipline (player_id, o_swing_pct, z_swing_pct, swing_pct, o_contact_pct, z_contact_pct, contact_pct, zone_pct, f_strike_pct, swstr_pct, csw_pct) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (player_id, safe_float(row.get('O-Swing%')), safe_float(row.get('Z-Swing%')), safe_float(row.get('Swing%')), safe_float(row.get('O-Contact%')), safe_float(row.get('Z-Contact%')), safe_float(row.get('Contact%')), safe_float(row.get('Zone%')), safe_float(row.get('F-Strike%')), safe_float(row.get('SwStr%')), safe_float(row.get('CSW%'))))
+                count += 1
+            print(f"      Loaded {count} hitter discipline rows")
+    
+    # 17. Hitter Batted Ball
+    if os.path.exists('fangraphs-leaderboards-2.csv'):
+        print("\n[17] Loading hitter batted ball...")
+        cursor.execute("DELETE FROM hitter_batted_ball")
+        with open('fangraphs-leaderboards-2.csv', 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            count = 0
+            for row in reader:
+                name = row.get('Name', row.get('NameASCII', ''))
+                if not name: continue
+                player_id = make_player_id(name)
+                cursor.execute("INSERT INTO hitter_batted_ball (player_id, gb_pct, fb_pct, ld_pct, hr_fb, pull_pct, cent_pct, oppo_pct, soft_pct, med_pct, hard_pct) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (player_id, safe_float(row.get('GB%')), safe_float(row.get('FB%')), safe_float(row.get('LD%')), safe_float(row.get('HR/FB')), safe_float(row.get('Pull%')), safe_float(row.get('Cent%')), safe_float(row.get('Oppo%')), safe_float(row.get('Soft%')), safe_float(row.get('Med%')), safe_float(row.get('Hard%'))))
+                count += 1
+            print(f"      Loaded {count} hitter batted ball rows")
+    
+    # 18. Pitcher Discipline
+    if os.path.exists('fangraphs-leaderboards-4.csv'):
+        print("\n[18] Loading pitcher discipline...")
+        cursor.execute("DELETE FROM pitcher_discipline")
+        with open('fangraphs-leaderboards-4.csv', 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            count = 0
+            for row in reader:
+                name = row.get('Name', row.get('NameASCII', ''))
+                if not name: continue
+                player_id = make_player_id(name)
+                cursor.execute("INSERT INTO pitcher_discipline (player_id, o_swing_pct, z_swing_pct, swing_pct, o_contact_pct, z_contact_pct, contact_pct, zone_pct, f_strike_pct, swstr_pct, csw_pct) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (player_id, safe_float(row.get('O-Swing%')), safe_float(row.get('Z-Swing%')), safe_float(row.get('Swing%')), safe_float(row.get('O-Contact%')), safe_float(row.get('Z-Contact%')), safe_float(row.get('Contact%')), safe_float(row.get('Zone%')), safe_float(row.get('F-Strike%')), safe_float(row.get('SwStr%')), safe_float(row.get('CSW%'))))
+                count += 1
+            print(f"      Loaded {count} pitcher discipline rows")
+    
+    # 19. Pitch Movement
+    if os.path.exists('pitch_movement.csv'):
+        print("\n[19] Loading pitch movement...")
+        cursor.execute("DELETE FROM pitch_movement")
+        with open('pitch_movement.csv', 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            count = 0
+            for row in reader:
+                name = row.get('last_name, first_name', '')
+                if not name: continue
+                if ',' in name:
+                    parts = name.split(',', 1)
+                    name = f"{parts[1].strip()} {parts[0].strip()}"
+                player_id = make_player_id(name)
+                cursor.execute("INSERT INTO pitch_movement (player_id, pitch_type, pitch_name, avg_speed, break_z, break_z_induced, break_x, pitches_thrown) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (player_id, row.get('pitch_type', ''), row.get('pitch_type_name', ''), safe_float(row.get('avg_speed')), safe_float(row.get('pitcher_break_z')), safe_float(row.get('pitcher_break_z_induced')), safe_float(row.get('pitcher_break_x')), safe_int(row.get('pitches_thrown'))))
+                count += 1
+            print(f"      Loaded {count} pitch movement rows")
     
     conn.commit()
+    
+    # Print summary
+    print("\n" + "=" * 60)
+    print("IMPORT SUMMARY")
+    print("=" * 60)
     cursor.execute("SELECT COUNT(*) as c FROM players WHERE position='P'")
     p_count = cursor.fetchone()['c']
     cursor.execute("SELECT COUNT(*) as c FROM players WHERE position!='P'")
@@ -399,12 +636,98 @@ def import_csvs():
     a_count = cursor.fetchone()['c']
     cursor.execute("SELECT COUNT(*) as c FROM hitter_vs_pitch")
     hvp_count = cursor.fetchone()['c']
-    print(f"\nFINAL: {p_count} pitchers, {h_count} hitters, {a_count} arsenal, {hvp_count} hitter vs pitch")
+    cursor.execute("SELECT COUNT(*) as c FROM catcher_stats")
+    c_count = cursor.fetchone()['c']
+    cursor.execute("SELECT COUNT(*) as c FROM fielding_stats")
+    f_count = cursor.fetchone()['c']
+    cursor.execute("SELECT COUNT(*) as c FROM baserunning_stats")
+    b_count = cursor.fetchone()['c']
+    cursor.execute("SELECT COUNT(*) as c FROM hitter_splits")
+    s_count = cursor.fetchone()['c']
+    cursor.execute("SELECT COUNT(*) as c FROM hitter_discipline")
+    hd_count = cursor.fetchone()['c']
+    cursor.execute("SELECT COUNT(*) as c FROM pitcher_discipline")
+    pd_count = cursor.fetchone()['c']
+    cursor.execute("SELECT COUNT(*) as c FROM pitch_movement")
+    pm_count = cursor.fetchone()['c']
+    
+    print(f"  Pitchers: {p_count}")
+    print(f"  Hitters: {h_count}")
+    print(f"  Pitch Arsenal: {a_count}")
+    print(f"  Hitter vs Pitch: {hvp_count}")
+    print(f"  Catchers: {c_count}")
+    print(f"  Fielding: {f_count}")
+    print(f"  Baserunning: {b_count}")
+    print(f"  Hitter Splits: {s_count}")
+    print(f"  Hitter Discipline: {hd_count}")
+    print(f"  Pitcher Discipline: {pd_count}")
+    print(f"  Pitch Movement: {pm_count}")
+    
     conn.close()
-    return {'pitchers': p_count, 'hitters': h_count, 'arsenal': a_count, 'hitter_vs_pitch': hvp_count}
+    return {'pitchers': p_count, 'hitters': h_count, 'arsenal': a_count, 'hitter_vs_pitch': hvp_count, 
+            'catchers': c_count, 'fielding': f_count, 'baserunning': b_count, 'splits': s_count,
+            'hitter_discipline': hd_count, 'pitcher_discipline': pd_count, 'pitch_movement': pm_count}
 
 # =============================================================================
-# PROJECTION ENGINE - FIXED MATH
+# PROJECTION ENGINE - v3.0 FULLY INTEGRATED
+# =============================================================================
+# 
+# HOW THE MODEL CALCULATES RUNS:
+# 
+# For each hitter vs pitcher matchup:
+#   1. GET BASELINE wOBA
+#      - Use vs LHP or vs RHP split if available (priority)
+#      - Otherwise use (overall wOBA + xwOBA) / 2
+#   
+#   2. PITCH ARSENAL MATCHUP
+#      - For each pitch the pitcher throws (weighted by usage %):
+#        - Get pitcher's wOBA allowed on that pitch
+#        - Get hitter's wOBA vs that pitch type
+#        - Average them = matchup wOBA for that pitch
+#      - Weighted sum = overall arsenal matchup wOBA
+#      - Blend with baseline (30% weight)
+#   
+#   3. PITCHER QUALITY ADJUSTMENT
+#      - Compare pitcher xFIP to league average (4.10)
+#      - Elite pitcher (3.00 xFIP) = -0.013 wOBA adjustment
+#      - Bad pitcher (5.00 xFIP) = +0.011 wOBA adjustment
+#   
+#   4. PLATOON/DISCIPLINE ADJUSTMENT
+#      - High chase hitter vs high chase-inducing pitcher = penalty
+#      - Contact hitter vs contact-suppressing pitcher = penalty
+#   
+#   5. K-RATE INTERACTION
+#      - High-K pitcher vs High-K hitter = -0.008 wOBA
+#      - Low-K matchup = +0.006 wOBA
+#   
+#   6. PARK FACTOR
+#      - Coors Field (1.15) = +0.002 wOBA
+#      - Petco (0.97) = -0.0005 wOBA
+#   
+#   7. CATCHER FRAMING ADJUSTMENT
+#      - Elite framer (+10 runs) helps pitcher = -0.003 wOBA
+#      - Bad framer (-10 runs) hurts pitcher = +0.003 wOBA
+#   
+#   8. DEFENSE ADJUSTMENT
+#      - Good team defense = fewer runs on balls in play
+#   
+#   9. CONVERT TO RUNS
+#      - Runs per PA = (Projected wOBA - 0.290) × 4.6
+#      - Bounded: 0.05 to 0.18 runs/PA
+#   
+#   10. EXPECTED PA BY LINEUP POSITION
+#       - Leadoff: 13.7% of team PA
+#       - #2: 13.0%, #3: 12.3%, etc.
+#       - Total F5 PA ≈ 21.5 (4.3 PA/inning × 5)
+#   
+#   11. PLAYER RUNS = Runs/PA × Expected PA
+#   
+#   12. TEAM F5 RUNS = Sum of all 9 hitters
+#   
+#   13. FULL GAME
+#       - Scale F5 to starter's expected innings
+#       - Add bullpen runs (league avg rate × remaining innings)
+#
 # =============================================================================
 
 def get_model_weights():
@@ -431,6 +754,56 @@ def get_hitter_vs_pitch(player_id):
     vs_pitch = {row['pitch_type']: dict(row) for row in cursor.fetchall()}
     conn.close()
     return vs_pitch
+
+def get_hitter_split(player_id, pitcher_hand):
+    """Get hitter's stats vs LHP or RHP"""
+    conn = get_db()
+    cursor = conn.cursor()
+    split_type = 'vs_LHP' if pitcher_hand == 'L' else 'vs_RHP'
+    cursor.execute("SELECT * FROM hitter_splits WHERE player_id=? AND split_type=?", (player_id, split_type))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def get_hitter_discipline(player_id):
+    """Get hitter's plate discipline metrics"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM hitter_discipline WHERE player_id=?", (player_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def get_pitcher_discipline(player_id):
+    """Get pitcher's plate discipline metrics"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM pitcher_discipline WHERE player_id=?", (player_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def get_catcher_stats(player_id):
+    """Get catcher framing/blocking stats"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM catcher_stats WHERE player_id=?", (player_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def get_team_defense(team_id):
+    """Get team's total defensive value (sum of OAA for starters)"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""SELECT SUM(outs_above_avg) as total_oaa, SUM(fielding_runs_prevented) as total_frp
+        FROM fielding_stats f JOIN players p ON f.player_id = p.player_id
+        WHERE p.team_id = ?""", (team_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if row and row['total_oaa']:
+        return {'oaa': row['total_oaa'], 'frp': row['total_frp']}
+    return None
 
 def calculate_arsenal_matchup(pitcher_arsenal, hitter_vs_pitch, weights):
     """Weight each pitch by usage and get matchup-specific expected wOBA."""
@@ -463,20 +836,45 @@ def calculate_arsenal_matchup(pitcher_arsenal, hitter_vs_pitch, weights):
         return round(weighted_woba / total_usage, 3), breakdown
     return None, []
 
-def calculate_matchup_detailed(pitcher, hitter, park_factor=1.0, weights=None, pitcher_arsenal=None, hitter_vs_pitch=None):
+def calculate_matchup_detailed(pitcher, hitter, park_factor=1.0, weights=None, pitcher_arsenal=None, hitter_vs_pitch=None, pitcher_hand='R', catcher=None, team_defense=None):
     """Calculate single batter vs pitcher matchup with full transparency."""
     if weights is None:
         weights = get_model_weights()
     breakdown = {'hitter_name': hitter.get('name', 'Unknown'), 'steps': []}
     
-    # Step 1: Baseline wOBA
-    h_woba = hitter.get('woba') or LEAGUE_AVG['woba']
-    h_xwoba = hitter.get('xwoba') or h_woba
-    baseline = (h_woba + h_xwoba) / 2
-    breakdown['steps'].append({'name': 'Baseline wOBA', 'formula': '(wOBA + xwOBA) / 2',
-        'values': f"({format_stat(h_woba)} + {format_stat(h_xwoba)}) / 2", 'result': round(baseline, 3)})
+    # ===========================================
+    # STEP 1: BASELINE wOBA (with L/R splits)
+    # ===========================================
+    split_data = get_hitter_split(hitter.get('player_id', ''), pitcher_hand)
     
-    # Step 2: Pitch Arsenal (if available)
+    if split_data and split_data.get('woba'):
+        # USE SPLIT DATA - this is the key integration
+        baseline = split_data['woba']
+        split_pa = split_data.get('pa', 0)
+        breakdown['steps'].append({
+            'name': f"Baseline wOBA (vs {pitcher_hand}HP)", 
+            'formula': f"Split wOBA from {split_pa} PA vs {pitcher_hand}HP",
+            'values': f"vs {pitcher_hand}HP: {baseline:.3f}", 
+            'result': round(baseline, 3)
+        })
+        breakdown['used_split'] = True
+        breakdown['split_pa'] = split_pa
+    else:
+        # Fallback to overall stats
+        h_woba = hitter.get('woba') or LEAGUE_AVG['woba']
+        h_xwoba = hitter.get('xwoba') or h_woba
+        baseline = (h_woba + h_xwoba) / 2
+        breakdown['steps'].append({
+            'name': 'Baseline wOBA', 
+            'formula': '(wOBA + xwOBA) / 2',
+            'values': f"({format_stat(h_woba)} + {format_stat(h_xwoba)}) / 2", 
+            'result': round(baseline, 3)
+        })
+        breakdown['used_split'] = False
+    
+    # ===========================================
+    # STEP 2: PITCH ARSENAL MATCHUP
+    # ===========================================
     arsenal_adj = 0
     arsenal_breakdown = []
     arsenal_weight = weights.get('arsenal_weight', 0.30)
@@ -484,20 +882,61 @@ def calculate_matchup_detailed(pitcher, hitter, park_factor=1.0, weights=None, p
         arsenal_woba, arsenal_breakdown = calculate_arsenal_matchup(pitcher_arsenal, hitter_vs_pitch, weights)
         if arsenal_woba:
             arsenal_adj = (arsenal_woba - baseline) * arsenal_weight
-            breakdown['steps'].append({'name': 'Pitch Arsenal Matchup',
+            breakdown['steps'].append({
+                'name': 'Pitch Arsenal Matchup',
                 'formula': f"(Arsenal wOBA - Baseline) × {arsenal_weight}",
                 'values': f"({arsenal_woba:.3f} - {baseline:.3f}) × {arsenal_weight}",
-                'result': round(arsenal_adj, 4)})
+                'result': round(arsenal_adj, 4)
+            })
             breakdown['arsenal_breakdown'] = arsenal_breakdown
     
-    # Step 3: Pitcher Quality
+    # ===========================================
+    # STEP 3: PITCHER QUALITY
+    # ===========================================
     p_xfip = pitcher.get('xfip') or pitcher.get('era') or LEAGUE_AVG['xfip']
     pitcher_factor = weights.get('pitcher_quality_factor', 0.012)
     pitcher_adj = (LEAGUE_AVG['xfip'] - p_xfip) * pitcher_factor
-    breakdown['steps'].append({'name': 'Pitcher Quality', 'formula': f"(League xFIP - Pitcher xFIP) × {pitcher_factor}",
-        'values': f"({LEAGUE_AVG['xfip']:.2f} - {p_xfip:.2f}) × {pitcher_factor}", 'result': round(pitcher_adj, 4)})
+    breakdown['steps'].append({
+        'name': 'Pitcher Quality', 
+        'formula': f"(League xFIP - Pitcher xFIP) × {pitcher_factor}",
+        'values': f"({LEAGUE_AVG['xfip']:.2f} - {p_xfip:.2f}) × {pitcher_factor}", 
+        'result': round(pitcher_adj, 4)
+    })
     
-    # Step 4: K-Rate Interaction
+    # ===========================================
+    # STEP 4: DISCIPLINE MATCHUP
+    # ===========================================
+    discipline_adj = 0
+    h_disc = get_hitter_discipline(hitter.get('player_id', ''))
+    p_disc = get_pitcher_discipline(pitcher.get('player_id', ''))
+    
+    if h_disc and p_disc:
+        # Chase rate interaction: high chase hitter vs high chase-inducing pitcher
+        h_chase = h_disc.get('o_swing_pct') or 0.30
+        p_chase_rate = p_disc.get('o_swing_pct') or 0.30  # How often batters chase vs this pitcher
+        
+        # High chase hitter (>35%) vs pitcher who induces chase (>35%) = bad for hitter
+        if h_chase > 0.35 and p_chase_rate > 0.35:
+            discipline_adj = -0.008
+            breakdown['steps'].append({
+                'name': 'Discipline Matchup',
+                'formula': 'High chase hitter vs chase-inducing pitcher',
+                'values': f"H O-Swing: {h_chase:.1%}, P O-Swing: {p_chase_rate:.1%}",
+                'result': round(discipline_adj, 4)
+            })
+        # Low chase hitter vs pitcher who can't induce chase = good for hitter
+        elif h_chase < 0.28 and p_chase_rate < 0.28:
+            discipline_adj = 0.005
+            breakdown['steps'].append({
+                'name': 'Discipline Matchup',
+                'formula': 'Patient hitter vs non-chase pitcher',
+                'values': f"H O-Swing: {h_chase:.1%}, P O-Swing: {p_chase_rate:.1%}",
+                'result': round(discipline_adj, 4)
+            })
+    
+    # ===========================================
+    # STEP 5: K-RATE INTERACTION
+    # ===========================================
     p_k9 = pitcher.get('k9') or 9.0
     h_k_rate = hitter.get('k_rate') or LEAGUE_AVG['k_rate']
     if p_k9 > 10.0 and h_k_rate > 25:
@@ -509,30 +948,84 @@ def calculate_matchup_detailed(pitcher, hitter, park_factor=1.0, weights=None, p
     else:
         k_adj = 0
         k_reason = f"Neutral K (P K/9: {p_k9:.1f}, H K%: {h_k_rate:.1f}%)"
-    breakdown['steps'].append({'name': 'K-Rate Interaction', 'formula': k_reason, 'values': '', 'result': round(k_adj, 4)})
+    breakdown['steps'].append({
+        'name': 'K-Rate Interaction', 
+        'formula': k_reason, 
+        'values': '', 
+        'result': round(k_adj, 4)
+    })
     
-    # Step 5: Park Factor
+    # ===========================================
+    # STEP 6: PARK FACTOR
+    # ===========================================
     park_mult = weights.get('park_factor_multiplier', 0.015)
     park_adj = (park_factor - 1.0) * park_mult
-    breakdown['steps'].append({'name': 'Park Factor', 'formula': f"(Park - 1.0) × {park_mult}",
-        'values': f"({park_factor:.2f} - 1.0) × {park_mult}", 'result': round(park_adj, 4)})
+    breakdown['steps'].append({
+        'name': 'Park Factor', 
+        'formula': f"(Park - 1.0) × {park_mult}",
+        'values': f"({park_factor:.2f} - 1.0) × {park_mult}", 
+        'result': round(park_adj, 4)
+    })
     
-    # Step 6: Final wOBA
-    total_adj = arsenal_adj + pitcher_adj + k_adj + park_adj
+    # ===========================================
+    # STEP 7: CATCHER FRAMING
+    # ===========================================
+    catcher_adj = 0
+    if catcher:
+        catcher_stats = get_catcher_stats(catcher.get('player_id', ''))
+        if catcher_stats and catcher_stats.get('framing_runs'):
+            framing = catcher_stats['framing_runs']
+            # ~10 framing runs over season = ~0.003 wOBA impact per PA
+            catcher_adj = -framing * 0.0003  # Negative because good framing helps pitcher
+            breakdown['steps'].append({
+                'name': 'Catcher Framing',
+                'formula': f"Framing runs ({framing:.1f}) × -0.0003",
+                'values': f"{catcher.get('name', 'Unknown')}: {framing:.1f} framing runs",
+                'result': round(catcher_adj, 4)
+            })
+    
+    # ===========================================
+    # STEP 8: TEAM DEFENSE (applied at team level, small per-PA impact)
+    # ===========================================
+    defense_adj = 0
+    if team_defense and team_defense.get('oaa'):
+        oaa = team_defense['oaa']
+        # Good defense (OAA +20) = ~0.002 wOBA saved per PA
+        defense_adj = -oaa * 0.0001
+        breakdown['steps'].append({
+            'name': 'Team Defense',
+            'formula': f"Team OAA ({oaa:.0f}) × -0.0001",
+            'values': f"Total OAA: {oaa:.0f}",
+            'result': round(defense_adj, 4)
+        })
+    
+    # ===========================================
+    # STEP 9: FINAL PROJECTED wOBA
+    # ===========================================
+    total_adj = arsenal_adj + pitcher_adj + discipline_adj + k_adj + park_adj + catcher_adj + defense_adj
     proj_woba = max(0.250, min(0.420, baseline + total_adj))
-    breakdown['steps'].append({'name': 'Projected wOBA', 'formula': 'Baseline + All Adjustments',
-        'values': f"{baseline:.3f} + {total_adj:.4f}", 'result': round(proj_woba, 3)})
+    breakdown['steps'].append({
+        'name': 'Projected wOBA', 
+        'formula': 'Baseline + All Adjustments',
+        'values': f"{baseline:.3f} + {total_adj:.4f}", 
+        'result': round(proj_woba, 3)
+    })
     
-    # Step 7: Convert to Runs
-    # Tighter bounds to produce realistic game totals (7-10 runs typical)
+    # ===========================================
+    # STEP 10: CONVERT TO RUNS
+    # ===========================================
     woba_baseline = weights.get('woba_baseline', 0.290)
     woba_mult = weights.get('woba_to_runs_multiplier', 4.6)
-    raw_runs_per_pa = (proj_woba - woba_baseline) * woba_mult
-    runs_per_pa = max(0.05, min(0.18, raw_runs_per_pa))  # Tighter bounds
-    breakdown['steps'].append({'name': 'Runs per PA', 'formula': f"(wOBA - {woba_baseline}) × {woba_mult}",
-        'values': f"({proj_woba:.3f} - {woba_baseline}) × {woba_mult} = {raw_runs_per_pa:.4f} → clamped to {runs_per_pa:.4f}", 
-        'result': round(runs_per_pa, 4)})
+    raw_runs = (proj_woba - woba_baseline) * woba_mult
+    runs_per_pa = max(0.05, min(0.18, raw_runs))  # Tighter bounds for realistic totals
+    breakdown['steps'].append({
+        'name': 'Runs per PA', 
+        'formula': f"(wOBA - {woba_baseline}) × {woba_mult}",
+        'values': f"({proj_woba:.3f} - {woba_baseline}) × {woba_mult} = {raw_runs:.4f} → {runs_per_pa:.4f}", 
+        'result': round(runs_per_pa, 4)
+    })
     
+    # Summary
     breakdown['baseline_woba'] = round(baseline, 3)
     breakdown['projected_woba'] = round(proj_woba, 3)
     breakdown['runs_per_pa'] = round(runs_per_pa, 4)
@@ -549,8 +1042,8 @@ def estimate_pitcher_innings(pitcher):
         return min(7.0, max(4.0, ip / gs))
     return 5.0
 
-def project_game(home_pitcher, away_pitcher, home_lineup, away_lineup, park_factor=1.0):
-    """Full game projection - FIXED to produce realistic totals (6-12 range)."""
+def project_game(home_pitcher, away_pitcher, home_lineup, away_lineup, park_factor=1.0, home_catcher=None, away_catcher=None, home_team_id=None, away_team_id=None):
+    """Full game projection with all data integrated."""
     weights = get_model_weights()
     pa_weights = [0.137, 0.130, 0.123, 0.116, 0.109, 0.103, 0.097, 0.093, 0.092]
     home_p_ip = estimate_pitcher_innings(home_pitcher)
@@ -560,27 +1053,60 @@ def project_game(home_pitcher, away_pitcher, home_lineup, away_lineup, park_fact
     home_arsenal = get_pitcher_arsenal(home_pitcher.get('player_id', ''))
     away_arsenal = get_pitcher_arsenal(away_pitcher.get('player_id', ''))
     
+    # Get pitcher handedness (default R if not specified)
+    home_p_hand = home_pitcher.get('throws', 'R') or 'R'
+    away_p_hand = away_pitcher.get('throws', 'R') or 'R'
+    
+    # Get team defense stats
+    home_defense = get_team_defense(home_team_id) if home_team_id else None
+    away_defense = get_team_defense(away_team_id) if away_team_id else None
+    
     result = {
-        'home_pitcher': {'name': home_pitcher.get('name', 'Unknown'), 'player_id': home_pitcher.get('player_id', ''),
-            'estimated_innings': round(home_p_ip, 1), 'era': home_pitcher.get('era'), 'xfip': home_pitcher.get('xfip'),
-            'k9': home_pitcher.get('k9'), 'arsenal_count': len(home_arsenal)},
-        'away_pitcher': {'name': away_pitcher.get('name', 'Unknown'), 'player_id': away_pitcher.get('player_id', ''),
-            'estimated_innings': round(away_p_ip, 1), 'era': away_pitcher.get('era'), 'xfip': away_pitcher.get('xfip'),
-            'k9': away_pitcher.get('k9'), 'arsenal_count': len(away_arsenal)},
-        'park_factor': park_factor, 'away_matchups': [], 'home_matchups': [],
+        'home_pitcher': {
+            'name': home_pitcher.get('name', 'Unknown'), 
+            'player_id': home_pitcher.get('player_id', ''),
+            'estimated_innings': round(home_p_ip, 1), 
+            'era': home_pitcher.get('era'), 
+            'xfip': home_pitcher.get('xfip'),
+            'k9': home_pitcher.get('k9'), 
+            'throws': home_p_hand,
+            'arsenal_count': len(home_arsenal)
+        },
+        'away_pitcher': {
+            'name': away_pitcher.get('name', 'Unknown'), 
+            'player_id': away_pitcher.get('player_id', ''),
+            'estimated_innings': round(away_p_ip, 1), 
+            'era': away_pitcher.get('era'), 
+            'xfip': away_pitcher.get('xfip'),
+            'k9': away_pitcher.get('k9'), 
+            'throws': away_p_hand,
+            'arsenal_count': len(away_arsenal)
+        },
+        'park_factor': park_factor, 
+        'away_matchups': [], 
+        'home_matchups': [],
     }
+    
+    # Track how many hitters used split data
+    away_splits_used = 0
+    home_splits_used = 0
     
     # Away team vs Home pitcher
     away_f5_runs = 0
     for i, hitter in enumerate(away_lineup[:9]):
         if not hitter: continue
         hvp = get_hitter_vs_pitch(hitter.get('player_id', ''))
-        matchup = calculate_matchup_detailed(home_pitcher, hitter, park_factor, weights, home_arsenal, hvp)
+        matchup = calculate_matchup_detailed(
+            home_pitcher, hitter, park_factor, weights, 
+            home_arsenal, hvp, home_p_hand, home_catcher, home_defense
+        )
         matchup['lineup_position'] = i + 1
         matchup['pa_share'] = pa_weights[i] if i < len(pa_weights) else 0.09
         matchup['expected_pa'] = round(f5_pa * matchup['pa_share'], 2)
         matchup['expected_runs'] = round(matchup['runs_per_pa'] * matchup['expected_pa'], 3)
         matchup['has_arsenal_data'] = len(hvp) > 0
+        if matchup.get('used_split'):
+            away_splits_used += 1
         result['away_matchups'].append(matchup)
         away_f5_runs += matchup['expected_runs']
     
@@ -589,42 +1115,48 @@ def project_game(home_pitcher, away_pitcher, home_lineup, away_lineup, park_fact
     for i, hitter in enumerate(home_lineup[:9]):
         if not hitter: continue
         hvp = get_hitter_vs_pitch(hitter.get('player_id', ''))
-        matchup = calculate_matchup_detailed(away_pitcher, hitter, park_factor, weights, away_arsenal, hvp)
+        matchup = calculate_matchup_detailed(
+            away_pitcher, hitter, park_factor, weights, 
+            away_arsenal, hvp, away_p_hand, away_catcher, away_defense
+        )
         matchup['lineup_position'] = i + 1
         matchup['pa_share'] = pa_weights[i] if i < len(pa_weights) else 0.09
         matchup['expected_pa'] = round(f5_pa * matchup['pa_share'], 2)
         matchup['expected_runs'] = round(matchup['runs_per_pa'] * matchup['expected_pa'], 3)
         matchup['has_arsenal_data'] = len(hvp) > 0
+        if matchup.get('used_split'):
+            home_splits_used += 1
         result['home_matchups'].append(matchup)
         home_f5_runs += matchup['expected_runs']
     
-    # Bullpen calculations
-    # Away team faces home starter then home bullpen
-    # Home team faces away starter then away bullpen
-    home_bp_ip = max(0, 9 - home_p_ip)  # Innings home bullpen pitches
-    away_bp_ip = max(0, 9 - away_p_ip)  # Innings away bullpen pitches
+    # Bullpen calculations (corrected formula)
+    home_bp_ip = max(0, 9 - home_p_ip)
+    away_bp_ip = max(0, 9 - away_p_ip)
+    bp_runs_per_ip = LEAGUE_AVG['runs_per_game'] / 9 * 1.05
     
-    # Bullpen runs rate (slightly worse than starters)
-    bp_runs_per_ip = LEAGUE_AVG['runs_per_game'] / 9 * 1.05  # ~0.525 runs/IP
-    
-    # Calculate runs/IP vs each starter from F5 data
+    # Scale F5 runs to full game based on starter innings
     away_runs_per_ip = away_f5_runs / 5.0 if away_f5_runs > 0 else 0.5
     home_runs_per_ip = home_f5_runs / 5.0 if home_f5_runs > 0 else 0.5
     
-    # Full game: runs vs starter for their outing + runs vs bullpen
-    # Away team faces home starter (Pivetta) then home bullpen
     away_vs_starter = away_runs_per_ip * home_p_ip
     away_vs_bp = bp_runs_per_ip * home_bp_ip * park_factor
     away_full = away_vs_starter + away_vs_bp
     
-    # Home team faces away starter (Schwellenbach) then away bullpen  
     home_vs_starter = home_runs_per_ip * away_p_ip
     home_vs_bp = bp_runs_per_ip * away_bp_ip * park_factor
     home_full = home_vs_starter + home_vs_bp
     
     result['projections'] = {
-        'f5': {'home': round(home_f5_runs, 2), 'away': round(away_f5_runs, 2), 'total': round(home_f5_runs + away_f5_runs, 2)},
-        'full': {'home': round(home_full, 2), 'away': round(away_full, 2), 'total': round(home_full + away_full, 2)},
+        'f5': {
+            'home': round(home_f5_runs, 2), 
+            'away': round(away_f5_runs, 2), 
+            'total': round(home_f5_runs + away_f5_runs, 2)
+        },
+        'full': {
+            'home': round(home_full, 2), 
+            'away': round(away_full, 2), 
+            'total': round(home_full + away_full, 2)
+        },
         'bullpen': {
             'home_bp_innings': round(home_bp_ip, 1), 
             'away_bp_innings': round(away_bp_ip, 1),
@@ -634,13 +1166,22 @@ def project_game(home_pitcher, away_pitcher, home_lineup, away_lineup, park_fact
             'home_vs_bp': round(home_vs_bp, 2)
         }
     }
+    
+    # Data quality indicators
+    result['data_quality'] = {
+        'away_splits_used': away_splits_used,
+        'home_splits_used': home_splits_used,
+        'home_pitcher_arsenal': len(home_arsenal),
+        'away_pitcher_arsenal': len(away_arsenal)
+    }
+    
     return result
 
 # =============================================================================
 # INITIALIZE
 # =============================================================================
 
-print("Initializing MLB Prediction Model v2.0...")
+print("Initializing MLB Prediction Model v3.0...")
 init_db()
 import_csvs()
 
